@@ -48,7 +48,7 @@ Studio manages layouts and approved binding paths only. It does not store API cr
 
 ## Shared Firestore workspace
 
-Studio works locally until a user signs in. After Google sign-in, the top bar shows one of four clear states: local-only, saving, shared-and-saved, or shared-sync-failed.
+Studio works locally until a user signs in with an administrator-created email/password account. The top bar then shows one of four clear states: local-only, saving, shared-and-saved, or shared-sync-failed.
 
 The shared data structure is:
 
@@ -72,6 +72,17 @@ Available roles are:
 - `admin`: designer permissions plus user-role administration and delete/rollback support.
 
 Deploy `firestore.rules` from the Firebase Console or Firebase CLI before enabling shared use. Do not replace it with public `allow read, write: if true` rules.
+
+### First shared-workspace administrator
+
+1. In Firebase Console → **Authentication** → **Sign-in method**, enable **Email/Password**. Disable Google if Studio should use passwords only.
+2. In Firebase Console → **Authentication** → **Users**, create the first Studio user with an email address and a strong temporary password.
+3. Copy that user’s UID.
+4. In Firestore, create `studioUsers/{UID}` with `{ "role": "admin" }`.
+5. Deploy `firestore.rules` and refresh Studio.
+6. The administrator signs in through Studio, then can save a draft and verify the top-bar status reads **Shared workspace is in sync**.
+
+Studio intentionally has no public sign-up form. New user accounts must be created from Firebase Console now; a future trusted admin backend can add user management inside Studio without exposing Firebase administration credentials to browsers.
 
 ## Run the Studio locally
 
