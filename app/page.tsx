@@ -509,6 +509,25 @@ export default function StudioPage() {
     setNotice("Bound " + bindingTarget + " to " + value + ".");
   }
 
+  function actionCapable(node: JsonObject) {
+    return ["button", "chip", "icon", "image", "box", "row", "text"].includes(node.type ?? "");
+  }
+
+  function setActionType(type: string) {
+    updateSelectedNode((node) => {
+      if (type === "none") {
+        delete node.action;
+        return;
+      }
+      const defaultTarget = type === "navigate" ? screens[0]?.route ?? "home" : type === "analytics" ? "component_tapped" : type === "refreshData" ? "screen" : type === "openUrl" ? "https://example.com" : type === "toggleState" ? "isEnabled" : "";
+      node.action = { type, target: node.action?.target || defaultTarget };
+    });
+  }
+
+  function setActionTarget(target: string) {
+    updateSelectedNode((node) => { node.action = { ...node.action, target }; });
+  }
+
   function deleteSelectedNode() {
     if (!selectedPath.length || !parsed.document) return;
     const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
@@ -693,9 +712,8 @@ export default function StudioPage() {
               </>}
               {selectedNode.type === "button" && <>
                 <label>Button label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => setSelectedProp("label", event.target.value)} /></label>
-                <label>Action type<select value={typeof selectedNode.action?.type === "string" ? selectedNode.action.type : "navigate"} onChange={(event) => updateSelectedNode((node) => { node.action = { ...node.action, type: event.target.value }; })}><option value="navigate">Navigate</option><option value="analytics">Analytics</option><option value="refreshData">Refresh data</option></select></label>
-                <label>Action target<input value={typeof selectedNode.action?.target === "string" ? selectedNode.action.target : ""} onChange={(event) => updateSelectedNode((node) => { node.action = { ...node.action, target: event.target.value }; })} /></label>
               </>}
+              {actionCapable(selectedNode) && <fieldset className="property-group action-builder"><legend>Action builder</legend><label>On tap<select value={selectedNode.action?.type ?? "none"} onChange={(event) => setActionType(event.target.value)}><option value="none">No action</option><option value="navigate">Navigate to screen</option><option value="back">Go back</option><option value="analytics">Track analytics event</option><option value="refreshData">Refresh data</option><option value="openUrl">Open web URL</option><option value="toggleState">Toggle local state</option></select></label>{selectedNode.action?.type === "navigate" && <label>Destination screen<select value={selectedNode.action.target ?? ""} onChange={(event) => setActionTarget(event.target.value)}>{screens.map((screen) => <option key={screen.id} value={screen.route}>{screen.title} — /{screen.route}</option>)}</select></label>}{selectedNode.action?.type === "analytics" && <label>Event name<input value={selectedNode.action.target ?? ""} placeholder="button_tapped" onChange={(event) => setActionTarget(event.target.value.replace(/\s+/g, "_"))} /></label>}{selectedNode.action?.type === "refreshData" && <label>Data source key<input value={selectedNode.action.target ?? ""} placeholder="wallet" onChange={(event) => setActionTarget(event.target.value)} /></label>}{selectedNode.action?.type === "openUrl" && <label>HTTPS URL<input type="url" value={selectedNode.action.target ?? ""} placeholder="https://example.com" onChange={(event) => setActionTarget(event.target.value)} /></label>}{selectedNode.action?.type === "toggleState" && <label>State key<input value={selectedNode.action.target ?? ""} placeholder="isEnabled" onChange={(event) => setActionTarget(event.target.value)} /></label>}{selectedNode.action?.type === "openUrl" && <p className="action-note">The production mobile host must allowlist approved URL domains.</p>}</fieldset>}
               {selectedNode.type === "image" && <><label>Image URL<input value={typeof selectedProps.src === "string" ? selectedProps.src : ""} onChange={(event) => setSelectedProp("src", event.target.value)} /></label><label>Accessibility description<input value={typeof selectedProps.contentDescription === "string" ? selectedProps.contentDescription : ""} onChange={(event) => setSelectedProp("contentDescription", event.target.value)} /></label></>}
               {selectedNode.type === "icon" && <><label>Icon name<input value={typeof selectedProps.name === "string" ? selectedProps.name : ""} onChange={(event) => setSelectedProp("name", event.target.value)} /></label><label>Accessibility description<input value={typeof selectedProps.contentDescription === "string" ? selectedProps.contentDescription : ""} onChange={(event) => setSelectedProp("contentDescription", event.target.value)} /></label></>}
               {(selectedNode.type === "textInput" || selectedNode.type === "switch" || selectedNode.type === "chip") && <label>Label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => setSelectedProp("label", event.target.value)} /></label>}
