@@ -292,6 +292,7 @@ export default function StudioPage() {
   const [showImporter, setShowImporter] = useState(false);
   const [importText, setImportText] = useState("");
   const [selectedPath, setSelectedPath] = useState<number[]>([]);
+  const [nestingTargetPath, setNestingTargetPath] = useState<number[] | null>(null);
   const [versions, setVersions] = useState<Record<string, Version[]>>({
     wallet: [
       { id: "wallet-v12-draft", number: 12, status: "Draft", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Just now" },
@@ -412,10 +413,13 @@ export default function StudioPage() {
       return;
     }
     const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
-    document.children = [...(document.children ?? []), componentTemplates[kind]];
+    const selectedContainer = nodeAtPath(document, selectedPath);
+    const target = selectedContainer && isContainer(selectedContainer) ? selectedContainer : document;
+    target.children = [...(target.children ?? []), componentTemplates[kind]];
     setJson(JSON.stringify(document, null, 2));
-    setSelectedPath([document.children.length - 1]);
-    setNotice("Added a " + kind + " component. Edit its values in the JSON editor or preview it below.");
+    const targetPath = selectedContainer && isContainer(selectedContainer) ? selectedPath : [];
+    setSelectedPath([...targetPath, (target.children?.length ?? 1) - 1]);
+    setNotice("Added a " + kind + " component " + (targetPath.length ? "inside the selected container." : "to the root screen."));
   }
 
   function nodeAtPath(document: JsonObject, path: number[]) {
@@ -439,6 +443,78 @@ export default function StudioPage() {
     setJson(JSON.stringify(document, null, 2));
     setSelectedPath([]);
     setNotice("Component removed from this draft.");
+  }
+
+  function isContainer(node: JsonObject) {
+    return ["column", "row", "box", "list", "grid", "repeater"].includes(node.type ?? "");
+  }
+
+  function moveSelectedBy(offset: number) {
+    if (!selectedPath.length || !parsed.document) return;
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    const parent = nodeAtPath(document, selectedPath.slice(0, -1));
+    const index = selectedPath[selectedPath.length - 1];
+    const destination = index + offset;
+    if (!parent?.children || destination < 0 || destination >= parent.children.length) {
+      setNotice("This component is already at the " + (offset < 0 ? "top" : "bottom") + " of its container.");
+      return;
+    }
+    [parent.children[index], parent.children[destination]] = [parent.children[destination], parent.children[index]];
+    setJson(JSON.stringify(document, null, 2));
+    setSelectedPath([...selectedPath.slice(0, -1), destination]);
+    setNotice("Component moved " + (offset < 0 ? "up" : "down") + ".");
+  }
+
+  function duplicateSelectedNode() {
+    if (!selectedPath.length || !parsed.document) return;
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    const parent = nodeAtPath(document, selectedPath.slice(0, -1));
+    const index = selectedPath[selectedPath.length - 1];
+    const selected = parent?.children?.[index];
+    if (!parent?.children || !selected) return;
+    parent.children.splice(index + 1, 0, JSON.parse(JSON.stringify(selected)) as JsonObject);
+    setJson(JSON.stringify(document, null, 2));
+    setSelectedPath([...selectedPath.slice(0, -1), index + 1]);
+    setNotice("Component duplicated.");
+  }
+
+  function setNestingTarget() {
+    if (!selectedNode || !isContainer(selectedNode)) {
+      setNotice("Choose a row, column, card, list, grid, or repeater as the nesting target.");
+      return;
+    }
+    setNestingTargetPath([...selectedPath]);
+    setNotice("Nesting target selected. Choose another component, then use Move into target.");
+  }
+
+  function moveSelectedIntoTarget() {
+    if (!nestingTargetPath || !selectedPath.length || !parsed.document) {
+      setNotice("Choose a nesting target first.");
+      return;
+    }
+    if (selectedPath.every((segment, index) => segment === nestingTargetPath[index]) && selectedPath.length <= nestingTargetPath.length) {
+      setNotice("A container cannot be moved into itself or one of its children.");
+      return;
+    }
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    const sourceParent = nodeAtPath(document, selectedPath.slice(0, -1));
+    const sourceIndex = selectedPath[selectedPath.length - 1];
+    const selected = sourceParent?.children?.[sourceIndex];
+    if (!sourceParent?.children || !selected) return;
+    sourceParent.children.splice(sourceIndex, 1);
+    const adjustedTargetPath = [...nestingTargetPath];
+    const sameParent = selectedPath.length === nestingTargetPath.length && selectedPath.slice(0, -1).every((segment, index) => segment === nestingTargetPath[index]);
+    if (sameParent && sourceIndex < adjustedTargetPath[adjustedTargetPath.length - 1]) adjustedTargetPath[adjustedTargetPath.length - 1] -= 1;
+    const target = nodeAtPath(document, adjustedTargetPath);
+    if (!target || !isContainer(target)) {
+      setNotice("The selected nesting target is no longer a container.");
+      return;
+    }
+    target.children = [...(target.children ?? []), selected];
+    setJson(JSON.stringify(document, null, 2));
+    setSelectedPath([...adjustedTargetPath, target.children.length - 1]);
+    setNestingTargetPath(null);
+    setNotice("Component moved into the selected container.");
   }
 
   function outline(node: JsonObject, path: number[] = [], depth = 0): ReactNode {
@@ -524,15 +600,17 @@ export default function StudioPage() {
 
           <aside className="right-column">
             <section className="card component-palette">
-              <div className="panel-heading compact"><div><h2>Visual builder</h2><p>Add a standard SDK component to the screen.</p></div></div>
+              <div className="panel-heading compact"><div><h2>Visual builder</h2><p>Add to {selectedNode && isContainer(selectedNode) ? "selected " + selectedNode.type : "root screen"}.</p></div></div>
               <div className="palette-grid">
                 {Object.keys(componentTemplates).map((kind) => <button key={kind} onClick={() => addComponent(kind)}><strong>+ {kind}</strong><span>Add to root</span></button>)}
               </div>
-              <div className="outline"><strong>Screen outline</strong>{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div>
+              <div className="outline"><strong>Screen outline</strong>{nestingTargetPath && <span className="nesting-target">Target: {nodeAtPath(parsed.document as JsonObject, nestingTargetPath)?.type}</span>}{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div>
             </section>
 
             {selectedNode && <section className="card property-editor">
               <div className="panel-heading compact"><div><h2>Component properties</h2><p>Editing <code>{selectedNode.type}</code></p></div>{selectedPath.length > 0 && <button className="danger-link" onClick={deleteSelectedNode}>Remove</button>}</div>
+              {selectedPath.length > 0 && <div className="layout-actions"><button onClick={() => moveSelectedBy(-1)}>↑ Move up</button><button onClick={() => moveSelectedBy(1)}>↓ Move down</button><button onClick={duplicateSelectedNode}>Duplicate</button><button onClick={moveSelectedIntoTarget} disabled={!nestingTargetPath}>Move into target</button></div>}
+              {isContainer(selectedNode) && <button className="nest-button" onClick={setNestingTarget}>Use {selectedNode.type} as nesting target</button>}
               {selectedNode.type === "text" && <label>Text value<input value={typeof selectedProps.value === "string" ? selectedProps.value : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, value: event.target.value }; })} /></label>}
               {selectedNode.type === "button" && <>
                 <label>Button label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, label: event.target.value }; })} /></label>
