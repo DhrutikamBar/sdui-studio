@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 type JsonObject = {
   type?: string;
@@ -187,7 +187,7 @@ function resolveText(value: unknown, scope: Record<string, unknown>): string {
   });
 }
 
-function styleFor(node: JsonObject, scope: Record<string, unknown>): React.CSSProperties {
+function styleFor(node: JsonObject, scope: Record<string, unknown>): CSSProperties {
   const style = (node.props?.style ?? {}) as Record<string, unknown>;
   const padding = style.padding === "md" ? 16 : style.padding === "sm" ? 8 : style.padding === "lg" ? 24 : 0;
   return {
@@ -202,7 +202,7 @@ function styleFor(node: JsonObject, scope: Record<string, unknown>): React.CSSPr
 }
 
 function MobilePreview({ document }: { document: JsonObject | null }) {
-  function renderNode(node: JsonObject, scope: Record<string, unknown>, key: string): React.ReactNode {
+  function renderNode(node: JsonObject, scope: Record<string, unknown>, key: string): ReactNode {
     const props = node.props ?? {};
     const children = node.children ?? [];
     if (node.type === "repeater") {
@@ -349,7 +349,15 @@ export default function StudioPage() {
               <div className="panel-heading compact"><div><h2>Approved data bindings</h2><p>Bindings come from API contracts, not arbitrary URLs.</p></div></div>
               <div className="binding-list">
                 {bindings.map(([path, description]) => (
-                  <button key={path} onClick={() => navigator.clipboard?.writeText("{{" + path + "}}").then(() => setNotice("Copied {{" + path + "}}. Paste it into the document."))}>
+                  <button
+                    key={path}
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        void navigator.clipboard.writeText("{{" + path + "}}");
+                      }
+                      setNotice("Copied {{" + path + "}}. Paste it into the document.");
+                    }}
+                  >
                     <strong>{"{{" + path + "}}"}</strong><span>{description}</span>
                   </button>
                 ))}
