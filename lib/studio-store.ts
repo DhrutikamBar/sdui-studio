@@ -8,6 +8,7 @@ export type RemoteScreen = {
   status: "Draft" | "Published";
   version: number;
   updatedAt: number;
+  updatedBy?: string;
 };
 
 export type RemoteVersion = {
@@ -18,6 +19,7 @@ export type RemoteVersion = {
   route: string;
   document: string;
   createdAt: number;
+  createdBy?: string;
 };
 
 export function watchRemoteScreens(callback: (screens: RemoteScreen[]) => void, onError: (message: string) => void) {
@@ -35,9 +37,14 @@ export async function loadRemoteVersions(screenId: string): Promise<RemoteVersio
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as RemoteVersion));
 }
 
-export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt"> & { screenId: string };
+export type StudioActor = {
+  uid: string;
+  label: string;
+};
 
-export async function saveRemoteVersion(input: SaveRemoteVersionInput) {
+export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt" | "createdBy"> & { screenId: string };
+
+export async function saveRemoteVersion(input: SaveRemoteVersionInput, actor: StudioActor) {
   const db = firestore();
   if (!db) throw new Error("Firebase is not configured.");
   const createdAt = Date.now();
@@ -48,10 +55,13 @@ export async function saveRemoteVersion(input: SaveRemoteVersionInput) {
     status: input.status,
     version: input.number,
     updatedAt: createdAt,
+    updatedBy: actor.label,
   }, { merge: true });
   const { screenId, ...version } = input;
   await setDoc(doc(db, "sduiScreens", screenId, "versions", versionId), {
     ...version,
     createdAt,
+    createdBy: actor.label,
   });
 }
+
