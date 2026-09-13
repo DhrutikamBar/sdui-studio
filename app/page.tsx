@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { validateSduiDocument } from "../lib/validate";
 
 type JsonObject = {
   type?: string;
@@ -270,7 +271,9 @@ export default function StudioPage() {
 
   const parsed = useMemo(() => {
     try {
-      return { document: JSON.parse(json) as JsonObject, error: "" };
+      const document = JSON.parse(json) as JsonObject;
+      const errors = validateSduiDocument(document);
+      return { document: errors.length === 0 ? document : null, error: errors.join(" ") };
     } catch (error) {
       return { document: null, error: error instanceof Error ? error.message : "Invalid JSON" };
     }
