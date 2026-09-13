@@ -195,6 +195,16 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
 .confirm-dialog { width: min(420px, 100%); padding: 22px; border-radius: 12px; background: #fff; box-shadow: 0 20px 70px rgba(16, 24, 39, .25); }
 .confirm-dialog p { color: #667085; line-height: 1.5; font-size: 13px; }
 .confirm-dialog > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.sign-in-dialog { display: grid; gap: 12px; padding: 28px; border-radius: 16px; }
+.sign-in-dialog .eyebrow { margin-bottom: -4px; color: #5e56dc; }
+.sign-in-dialog h2 { font-size: 23px; }
+.sign-in-dialog > p:not(.eyebrow) { margin: -4px 0 4px; }
+.sign-in-dialog label { gap: 6px; }
+.sign-in-dialog input { width: 100%; }
+.sign-in-dialog .sign-in-error { margin: -2px 0; color: #a14b13; font-size: 12px; }
+.reset-link { width: fit-content; padding: 0; color: #554ddd; border: 0; background: transparent; font-size: 12px; font-weight: 750; }
+.reset-link:disabled, .sign-in-dialog button:disabled { cursor: not-allowed; opacity: .55; }
+.sign-in-dialog > div { margin-top: 4px; }
 .phone-home { height: 11px; width: 78px; background: #fff; margin: 8px auto 0; border-radius: 999px; opacity: .85; }
 
 @media (max-width: 980px) {
