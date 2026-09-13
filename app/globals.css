@@ -86,6 +86,8 @@ textarea { min-height: 670px; resize: vertical; border-radius: 8px; padding: 15p
 .property-editor input, .property-editor select { width: 100%; }
 .property-group { display: grid; gap: 10px; margin: 2px 0 0; padding: 11px; border: 1px solid #e3e6ef; border-radius: 8px; }
 .property-group legend { padding: 0 4px; color: #667085; font-size: 11px; font-weight: 750; }
+.action-builder { border-color: #d8d4ff; background: #fbfbff; }
+.action-note { margin: 0; color: #7b8496; font-size: 10px; line-height: 1.4; }
 .check-label { display: flex !important; align-items: center; gap: 8px !important; }
 .check-label input { width: auto !important; }
 .danger-link { border: 0; color: #b42318; background: transparent; padding: 0; font-size: 12px; font-weight: 750; }
