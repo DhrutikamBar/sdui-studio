@@ -181,6 +181,27 @@ const initialScreens: Screen[] = [
   { id: "settings", route: "settings", title: "Settings", status: "Published", version: 3, updatedAt: "Sep 11" }
 ];
 
+function localScreenDocument(title: string, subtitle: string, actionLabel: string, actionTarget: string, background: string): JsonObject {
+  return {
+    type: "column",
+    props: { style: { padding: "md", background } },
+    children: [
+      { type: "text", props: { value: title, style: { color: "#FFFFFF", fontSize: 26, fontWeight: "bold" } } },
+      { type: "text", props: { value: subtitle, style: { color: "#D5E3FF", fontSize: 15 } } },
+      { type: "spacer", props: { height: 20 } },
+      { type: "button", props: { label: actionLabel }, action: { type: "navigate", target: actionTarget } }
+    ]
+  };
+}
+
+const localScreenDocuments: Record<string, JsonObject> = {
+  home: localScreenDocument("Home", "Your personalised dashboard is ready.", "Open wallet", "wallet", "#173B76"),
+  wallet: starterDocument,
+  checkout: localScreenDocument("Checkout", "Review the order before payment.", "Continue", "order-confirmed", "#3C235C"),
+  send: localScreenDocument("Send money", "Choose a contact and enter an amount.", "Continue", "send-success", "#1D5C54"),
+  settings: localScreenDocument("Settings", "Manage notifications and preferences.", "Return home", "home", "#34415B")
+};
+
 const bindings = [
   ["user.firstName", "Profile / first name"],
   ["user.name", "Profile / full name"],
@@ -343,6 +364,9 @@ export default function StudioPage() {
   const [title, setTitle] = useState("Wallet");
   const [route, setRoute] = useState("wallet");
   const [json, setJson] = useState(JSON.stringify(starterDocument, null, 2));
+  const [screenDocuments, setScreenDocuments] = useState<Record<string, string>>(() => Object.fromEntries(
+    Object.entries(localScreenDocuments).map(([id, document]) => [id, JSON.stringify(document, null, 2)])
+  ));
   const [notice, setNotice] = useState("Draft loaded. Make a change, preview it, then publish.");
   const [showSampleData, setShowSampleData] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
@@ -453,6 +477,8 @@ export default function StudioPage() {
     setSelectedId(id);
     setTitle(copy.title);
     setRoute(copy.route);
+    setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: json }));
+    setJson(json);
     setVersions((current) => ({ ...current, [id]: [{ id: id + "-draft", number: 0, status: "Draft", title: copy.title, route: copy.route, document: json, createdAt: "Just now", note: "Copied from " + selectedId }] }));
     setNotice("Created a draft copy. Give it a unique route before publishing.");
   }
@@ -477,7 +503,9 @@ export default function StudioPage() {
     setSelectedId(id);
     setTitle(name);
     setRoute("new-screen");
-    setJson(JSON.stringify({ type: "column", props: { style: { padding: "md" } }, children: [] }, null, 2));
+    const document = JSON.stringify({ type: "column", props: { style: { padding: "md" } }, children: [] }, null, 2);
+    setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: document }));
+    setJson(document);
     setNotice("New draft screen created. Give it a route, add content, then save a draft.");
   }
 
@@ -721,9 +749,18 @@ export default function StudioPage() {
   const activeSampleData = sampleScenarios[sampleScenario].data;
 
   async function chooseScreen(screen: Screen) {
+    const fallback = screenDocuments[screen.id] ?? JSON.stringify(
+      localScreenDocument(screen.title, "This bundled screen is ready to edit.", "Continue", "home", "#34415B"),
+      null,
+      2
+    );
+    setScreenDocuments((current) => ({ ...current, [selectedId]: json }));
     setSelectedId(screen.id);
     setTitle(screen.title);
     setRoute(screen.route);
+    setJson(fallback);
+    setSelectedPath([]);
+    setNestingTargetPath(null);
     if (firebaseUser) {
       try {
         const remoteVersions = await loadRemoteVersions(screen.id);
@@ -731,13 +768,17 @@ export default function StudioPage() {
           setVersions((current) => ({ ...current, [screen.id]: remoteVersions.map((item) => ({ ...item, createdAt: new Date(item.createdAt).toLocaleString() })) }));
           const latest = remoteVersions[0];
           setJson(latest.document);
+          setScreenDocuments((current) => ({ ...current, [screen.id]: latest.document }));
+        } else {
+          setNotice("Selected " + screen.title + ". No shared version exists yet, so the bundled draft is shown.");
+          return;
         }
       } catch (error) {
-        setNotice("Selected " + screen.title + ". Could not load Firestore versions: " + (error instanceof Error ? error.message : "Unknown error"));
+        setNotice("Selected " + screen.title + ". Using bundled draft because Firestore versions could not load: " + (error instanceof Error ? error.message : "Unknown error"));
         return;
       }
     }
-    setNotice("Selected " + screen.title + ".");
+    setNotice("Selected " + screen.title + ". Showing its own bundled draft.");
   }
 
   async function toggleStudioSignIn() {
