@@ -10,6 +10,7 @@ type JsonObject = {
   id?: string;
   props?: Record<string, unknown>;
   children?: JsonObject[];
+  action?: { type?: string; target?: string };
   [key: string]: unknown;
 };
 
@@ -290,6 +291,7 @@ export default function StudioPage() {
   const [showSampleData, setShowSampleData] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [importText, setImportText] = useState("");
+  const [selectedPath, setSelectedPath] = useState<number[]>([]);
   const [versions, setVersions] = useState<Record<string, Version[]>>({
     wallet: [
       { id: "wallet-v12-draft", number: 12, status: "Draft", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Just now" },
@@ -412,12 +414,41 @@ export default function StudioPage() {
     const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
     document.children = [...(document.children ?? []), componentTemplates[kind]];
     setJson(JSON.stringify(document, null, 2));
+    setSelectedPath([document.children.length - 1]);
     setNotice("Added a " + kind + " component. Edit its values in the JSON editor or preview it below.");
   }
 
-  function outline(node: JsonObject, depth = 0): ReactNode {
-    return <div className="outline-node" key={node.id ?? (node.type ?? "unknown") + depth + Math.random()} style={{ paddingLeft: depth * 12 }}><span>{node.type ?? "unknown"}</span>{node.children?.map((child) => outline(child, depth + 1))}</div>;
+  function nodeAtPath(document: JsonObject, path: number[]) {
+    return path.reduce<JsonObject | null>((node, index) => node?.children?.[index] ?? null, document);
   }
+
+  function updateSelectedNode(update: (node: JsonObject) => void) {
+    if (!parsed.document) return;
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    const node = nodeAtPath(document, selectedPath);
+    if (!node) return;
+    update(node);
+    setJson(JSON.stringify(document, null, 2));
+  }
+
+  function deleteSelectedNode() {
+    if (!selectedPath.length || !parsed.document) return;
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    const parent = nodeAtPath(document, selectedPath.slice(0, -1));
+    parent?.children?.splice(selectedPath[selectedPath.length - 1], 1);
+    setJson(JSON.stringify(document, null, 2));
+    setSelectedPath([]);
+    setNotice("Component removed from this draft.");
+  }
+
+  function outline(node: JsonObject, path: number[] = [], depth = 0): ReactNode {
+    const isSelected = path.length === selectedPath.length && path.every((value, index) => value === selectedPath[index]);
+    return <div className="outline-node" key={node.id ?? (path.join("-") || "root")} style={{ paddingLeft: depth * 12 }}><button className={isSelected ? "outline-selected" : ""} onClick={() => setSelectedPath(path)}>{node.type ?? "unknown"}</button>{node.children?.map((child, index) => outline(child, [...path, index], depth + 1))}</div>;
+  }
+
+  const selectedNode = parsed.document ? nodeAtPath(parsed.document, selectedPath) : null;
+  const selectedProps = (selectedNode?.props ?? {}) as Record<string, unknown>;
+  const selectedStyle = (selectedProps.style ?? {}) as Record<string, unknown>;
 
   async function chooseScreen(screen: Screen) {
     setSelectedId(screen.id);
@@ -499,6 +530,19 @@ export default function StudioPage() {
               </div>
               <div className="outline"><strong>Screen outline</strong>{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div>
             </section>
+
+            {selectedNode && <section className="card property-editor">
+              <div className="panel-heading compact"><div><h2>Component properties</h2><p>Editing <code>{selectedNode.type}</code></p></div>{selectedPath.length > 0 && <button className="danger-link" onClick={deleteSelectedNode}>Remove</button>}</div>
+              {selectedNode.type === "text" && <label>Text value<input value={typeof selectedProps.value === "string" ? selectedProps.value : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, value: event.target.value }; })} /></label>}
+              {selectedNode.type === "button" && <>
+                <label>Button label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, label: event.target.value }; })} /></label>
+                <label>Action type<select value={typeof selectedNode.action?.type === "string" ? selectedNode.action.type : "navigate"} onChange={(event) => updateSelectedNode((node) => { node.action = { ...node.action, type: event.target.value }; })}><option value="navigate">Navigate</option><option value="analytics">Analytics</option><option value="refreshData">Refresh data</option></select></label>
+                <label>Action target<input value={typeof selectedNode.action?.target === "string" ? selectedNode.action.target : ""} onChange={(event) => updateSelectedNode((node) => { node.action = { ...node.action, target: event.target.value }; })} /></label>
+              </>}
+              <label>Background color<input value={typeof selectedStyle.background === "string" ? selectedStyle.background : ""} placeholder="#FFFFFF" onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), background: event.target.value } }; })} /></label>
+              <label>Text color<input value={typeof selectedStyle.color === "string" ? selectedStyle.color : ""} placeholder="#142039" onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), color: event.target.value } }; })} /></label>
+              <label>Padding<select value={typeof selectedStyle.padding === "string" ? selectedStyle.padding : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), padding: event.target.value } }; })}><option value="">None</option><option value="xs">Extra small</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">Extra large</option></select></label>
+            </section>}
 
             <section className="card">
               <div className="panel-heading compact"><div><h2>Approved data bindings</h2><p>Bindings come from API contracts, not arbitrary URLs.</p></div></div>
