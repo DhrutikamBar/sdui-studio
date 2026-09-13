@@ -40,6 +40,8 @@ type ImportCandidate = {
   warnings: string[];
 };
 
+type SyncState = "local" | "syncing" | "saved" | "failed";
+
 const starterDocument = {
   type: "column",
   props: {
@@ -389,16 +391,28 @@ export default function StudioPage() {
       { id: "wallet-v11", number: 11, status: "Published", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Today, 10:24" }
     ]
   });
-  const [firebaseUser, setFirebaseUser] = useState<{ displayName: string | null; email: string | null } | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<{ uid: string; displayName: string | null; email: string | null } | null>(null);
+  const [syncState, setSyncState] = useState<SyncState>("local");
+  const [syncDetail, setSyncDetail] = useState("Local browser workspace");
 
-  useEffect(() => observeStudioUser((user) => setFirebaseUser(user ? { displayName: user.displayName, email: user.email } : null)), []);
+  useEffect(() => observeStudioUser((user) => {
+    setFirebaseUser(user ? { uid: user.uid, displayName: user.displayName, email: user.email } : null);
+    setSyncState("local");
+    setSyncDetail(user ? "Signed in — connecting to shared workspace" : "Local browser workspace");
+  }), []);
 
   useEffect(() => {
     if (!firebaseUser) return;
     return watchRemoteScreens((remote) => {
       if (!remote.length) return;
       setScreens(remote.map((screen) => ({ ...screen, updatedAt: new Date(screen.updatedAt).toLocaleString() })));
-    }, (message) => setNotice("Firestore sync is unavailable: " + message));
+      setSyncState("saved");
+      setSyncDetail("Shared workspace is in sync");
+    }, (message) => {
+      setSyncState("failed");
+      setSyncDetail("Shared sync needs attention");
+      setNotice("Firestore sync is unavailable: " + message);
+    });
   }, [firebaseUser]);
 
   const parsed = useMemo(() => {
@@ -425,9 +439,15 @@ export default function StudioPage() {
     }));
     if (firebaseUser) {
       try {
-        await saveRemoteVersion({ screenId: selectedId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json });
+        setSyncState("syncing");
+        setSyncDetail("Saving draft to shared workspace…");
+        await saveRemoteVersion({ screenId: selectedId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+        setSyncState("saved");
+        setSyncDetail("Draft saved to shared workspace");
         setNotice("Draft snapshot saved to Firestore.");
       } catch (error) {
+        setSyncState("failed");
+        setSyncDetail("Draft saved locally — shared save failed");
         setNotice("Local draft saved, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
       }
     } else {
@@ -458,9 +478,15 @@ export default function StudioPage() {
     }));
     if (firebaseUser) {
       try {
-        await saveRemoteVersion({ screenId: selectedId, number: nextVersion, status: "Published", title, route, document: json });
+        setSyncState("syncing");
+        setSyncDetail("Publishing to shared workspace…");
+        await saveRemoteVersion({ screenId: selectedId, number: nextVersion, status: "Published", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+        setSyncState("saved");
+        setSyncDetail("Published version saved to shared workspace");
         setNotice("Published v" + nextVersion + " to Firestore.");
       } catch (error) {
+        setSyncState("failed");
+        setSyncDetail("Published locally — shared publish failed");
         setNotice("Local version published, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
       }
     } else {
@@ -809,7 +835,7 @@ export default function StudioPage() {
       <section className="workspace">
         <header className="topbar">
           <div><p className="eyebrow">SCREENS / {route.toUpperCase()}</p><h1>{title}</h1></div>
-          <div className="top-actions"><button className="firebase-state" onClick={toggleStudioSignIn}>{firebaseUser ? "● " + (firebaseUser.displayName ?? firebaseUser.email ?? "Signed in") : isFirebaseConfigured ? "Sign in to Firebase" : "Firebase setup required"}</button><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
+          <div className="top-actions"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><button className="firebase-state" onClick={toggleStudioSignIn}>{firebaseUser ? "● " + (firebaseUser.displayName ?? firebaseUser.email ?? "Signed in — sign out") : isFirebaseConfigured ? "Sign in to sync" : "Firebase setup required"}</button><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
         </header>
 
         <div className="notice" role="status">{notice}</div>
