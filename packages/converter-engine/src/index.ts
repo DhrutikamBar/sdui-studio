@@ -175,7 +175,7 @@ function toHex(color: { r: number; g: number; b: number }) {
 }
 
 function parseDirective(name: string): { kind: string; value: string } | null {
-  const match = name.match(/(?:^|\\s)sdui:([a-z-]+)(?::([^\\s]+))?/i);
+  const match = name.match(/(?:^|\s)sdui:([a-z-]+)(?::([^\s]+))?/i);
   return match ? { kind: match[1].toLowerCase(), value: match[2]?.trim() ?? "" } : null;
 }
 
