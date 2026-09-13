@@ -201,6 +201,12 @@ const componentTemplates: Record<string, JsonObject> = {
   bottomNavigation: { type: "bottomNavigation", props: { items: ["Home", "Wallet", "Profile"], selectedIndex: 0 } },
 };
 
+const sampleScenarios: Record<string, { label: string; data: Record<string, unknown> }> = {
+  standard: { label: "Standard wallet", data: sampleData },
+  lowBalance: { label: "Low balance", data: { ...sampleData, wallet: { accountName: "Travel wallet", balanceDisplay: "$12.40", currency: "USD" }, transactions: [{ title: "Coffee shop", amountDisplay: "- $4.50", amountColor: "#D13D34" }] } },
+  emptyTransactions: { label: "No transactions", data: { ...sampleData, wallet: { accountName: "New wallet", balanceDisplay: "$0.00", currency: "USD" }, transactions: [] } },
+};
+
 function getValue(path: string, source: Record<string, unknown>): unknown {
   return path.split(".").reduce<unknown>((value, segment) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -235,7 +241,7 @@ function styleFor(node: JsonObject, scope: Record<string, unknown>): CSSProperti
   };
 }
 
-function MobilePreview({ document }: { document: JsonObject | null }) {
+function MobilePreview({ document, data, state, onRetry }: { document: JsonObject | null; data: Record<string, unknown>; state: string; onRetry: () => void }) {
   function renderNode(node: JsonObject, scope: Record<string, unknown>, key: string): ReactNode {
     const props = node.props ?? {};
     const children = node.children ?? [];
@@ -314,7 +320,10 @@ function MobilePreview({ document }: { document: JsonObject | null }) {
     <div className="phone-shell">
       <div className="phone-status"><span>10:39</span><span>5G ◒ 80%</span></div>
       <div className="phone-screen">
-        {document ? renderNode(document, sampleData, "root") : <p>Fix JSON to restore preview.</p>}
+        {state === "loading" && <div className="preview-loading"><i /><i /><i /><i /></div>}
+        {state === "empty" && <div className="preview-message"><strong>Nothing here yet</strong><span>There is no content to display for this state.</span></div>}
+        {(state === "error" || state === "retry") && <div className="preview-message"><strong>We could not load this screen</strong><span>Check the connection and try again.</span>{state === "retry" && <button onClick={onRetry}>Try again</button>}</div>}
+        {state === "content" && (document ? renderNode(document, data, "root") : <p>Fix JSON to restore preview.</p>)}
       </div>
       <div className="phone-home" />
     </div>
@@ -335,6 +344,8 @@ export default function StudioPage() {
   const [nestingTargetPath, setNestingTargetPath] = useState<number[] | null>(null);
   const [bindingTarget, setBindingTarget] = useState("value");
   const [bindingFilter, setBindingFilter] = useState("");
+  const [previewState, setPreviewState] = useState("content");
+  const [sampleScenario, setSampleScenario] = useState("standard");
   const [versions, setVersions] = useState<Record<string, Version[]>>({
     wallet: [
       { id: "wallet-v12-draft", number: 12, status: "Draft", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Just now" },
@@ -618,6 +629,7 @@ export default function StudioPage() {
   const selectedNode = parsed.document ? nodeAtPath(parsed.document, selectedPath) : null;
   const selectedProps = (selectedNode?.props ?? {}) as Record<string, unknown>;
   const selectedStyle = (selectedProps.style ?? {}) as Record<string, unknown>;
+  const activeSampleData = sampleScenarios[sampleScenario].data;
 
   async function chooseScreen(screen: Screen) {
     setSelectedId(screen.id);
@@ -731,7 +743,7 @@ export default function StudioPage() {
                 <input className="binding-filter" value={bindingFilter} onChange={(event) => setBindingFilter(event.target.value)} placeholder="Filter API fields…" />
                 <div className="binding-list">
                   {bindings.filter(([path, description]) => (path + " " + description).toLowerCase().includes(bindingFilter.toLowerCase())).map(([path, description]) => {
-                    const sample = getValue(path, sampleData);
+                    const sample = getValue(path, activeSampleData);
                     return <button key={path} onClick={() => applyBinding(path)}><strong>{"{{" + path + "}}"}</strong><span>{description}</span><small>{Array.isArray(sample) ? sample.length + " sample items" : "Sample: " + String(sample ?? "not available")}</small></button>;
                   })}
                 </div>
@@ -741,9 +753,9 @@ export default function StudioPage() {
 
             <section className="card">
               <button className="sample-toggle" onClick={() => setShowSampleData((value) => !value)}>
-                <span><strong>Sample API response</strong><small>Wallet and transactions</small></span><span>{showSampleData ? "−" : "+"}</span>
+                <span><strong>Sample API response</strong><small>{sampleScenarios[sampleScenario].label}</small></span><span>{showSampleData ? "−" : "+"}</span>
               </button>
-              {showSampleData && <pre>{JSON.stringify(sampleData, null, 2)}</pre>}
+              {showSampleData && <pre>{JSON.stringify(activeSampleData, null, 2)}</pre>}
             </section>
 
             <section className="card versions">
@@ -755,8 +767,8 @@ export default function StudioPage() {
         </div>
 
         <section className="preview-section">
-          <div className="preview-copy"><p className="eyebrow">LIVE PREVIEW</p><h2>Wallet with sample API data</h2><p>This browser preview validates layout and bindings quickly. Android and iOS SDK rendering remain the release authority.</p><div className="preview-state"><span className="state-active">Content</span><span>Loading</span><span>Empty</span><span>Error</span></div></div>
-          <MobilePreview document={parsed.document} />
+          <div className="preview-copy"><p className="eyebrow">LIVE PREVIEW</p><h2>Test real screen states</h2><p>Use the same document with representative API responses and failure states before it reaches Android or iOS.</p><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
+          <MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} />
         </section>
       </section>
     </main>
