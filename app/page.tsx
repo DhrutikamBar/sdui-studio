@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { validateSduiDocument } from "../lib/validate";
+import { isFirebaseConfigured, observeStudioUser, signInToStudio, signOutOfStudio } from "../lib/firebase";
+import { loadRemoteVersions, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
 
 type JsonObject = {
   type?: string;
@@ -286,6 +288,17 @@ export default function StudioPage() {
       { id: "wallet-v11", number: 11, status: "Published", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Today, 10:24" }
     ]
   });
+  const [firebaseUser, setFirebaseUser] = useState<{ displayName: string | null; email: string | null } | null>(null);
+
+  useEffect(() => observeStudioUser((user) => setFirebaseUser(user ? { displayName: user.displayName, email: user.email } : null)), []);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    return watchRemoteScreens((remote) => {
+      if (!remote.length) return;
+      setScreens(remote.map((screen) => ({ ...screen, updatedAt: new Date(screen.updatedAt).toLocaleString() })));
+    }, (message) => setNotice("Firestore sync is unavailable: " + message));
+  }, [firebaseUser]);
 
   const parsed = useMemo(() => {
     try {
@@ -297,7 +310,7 @@ export default function StudioPage() {
     }
   }, [json]);
 
-  function saveDraft() {
+  async function saveDraft() {
     if (parsed.error) {
       setNotice("Fix the JSON error before saving.");
       return;
@@ -309,10 +322,19 @@ export default function StudioPage() {
       ...current,
       [selectedId]: [{ id: selectedId + "-draft-" + Date.now(), number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json, createdAt: "Just now" }, ...(current[selectedId] ?? [])]
     }));
-    setNotice("Draft snapshot saved locally. It is ready to be stored in Firestore once Firebase is connected.");
+    if (firebaseUser) {
+      try {
+        await saveRemoteVersion({ id: selectedId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json });
+        setNotice("Draft snapshot saved to Firestore.");
+      } catch (error) {
+        setNotice("Local draft saved, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
+      }
+    } else {
+      setNotice(isFirebaseConfigured ? "Draft saved locally. Sign in to save it to Firestore." : "Draft snapshot saved locally. Add Firebase environment variables to enable shared storage.");
+    }
   }
 
-  function publish() {
+  async function publish() {
     if (parsed.error) {
       setNotice("Publishing blocked: the document JSON is invalid.");
       return;
@@ -325,7 +347,16 @@ export default function StudioPage() {
       ...current,
       [selectedId]: [{ id: selectedId + "-v" + nextVersion, number: nextVersion, status: "Published", title, route, document: json, createdAt: "Just now" }, ...(current[selectedId] ?? [])]
     }));
-    setNotice("Published locally as v" + nextVersion + ". In Firebase mode this becomes an immutable published document for the mobile SDK.");
+    if (firebaseUser) {
+      try {
+        await saveRemoteVersion({ id: selectedId, number: nextVersion, status: "Published", title, route, document: json });
+        setNotice("Published v" + nextVersion + " to Firestore.");
+      } catch (error) {
+        setNotice("Local version published, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
+      }
+    } else {
+      setNotice(isFirebaseConfigured ? "Local version published. Sign in before publishing to Firestore." : "Published locally as v" + nextVersion + ". Add Firebase environment variables to publish for the mobile SDK.");
+    }
   }
 
   function createScreen() {
@@ -365,11 +396,33 @@ export default function StudioPage() {
     setNotice("Restored v" + version.number + " into the editor. Save it as a new draft before publishing.");
   }
 
-  function chooseScreen(screen: Screen) {
+  async function chooseScreen(screen: Screen) {
     setSelectedId(screen.id);
     setTitle(screen.title);
     setRoute(screen.route);
-    setNotice("Selected " + screen.title + ". This MVP keeps edits in browser memory.");
+    if (firebaseUser) {
+      try {
+        const remoteVersions = await loadRemoteVersions(screen.id);
+        if (remoteVersions.length) {
+          setVersions((current) => ({ ...current, [screen.id]: remoteVersions.map((item) => ({ ...item, createdAt: new Date(item.createdAt).toLocaleString() })) }));
+          const latest = remoteVersions[0];
+          setJson(latest.document);
+        }
+      } catch (error) {
+        setNotice("Selected " + screen.title + ". Could not load Firestore versions: " + (error instanceof Error ? error.message : "Unknown error"));
+        return;
+      }
+    }
+    setNotice("Selected " + screen.title + ".");
+  }
+
+  async function toggleStudioSignIn() {
+    try {
+      if (firebaseUser) await signOutOfStudio();
+      else await signInToStudio();
+    } catch (error) {
+      setNotice("Sign-in failed: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
   }
 
   return (
@@ -391,7 +444,7 @@ export default function StudioPage() {
       <section className="workspace">
         <header className="topbar">
           <div><p className="eyebrow">SCREENS / {route.toUpperCase()}</p><h1>{title}</h1></div>
-          <div className="top-actions"><button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
+          <div className="top-actions"><button className="firebase-state" onClick={toggleStudioSignIn}>{firebaseUser ? "● " + (firebaseUser.displayName ?? firebaseUser.email ?? "Signed in") : isFirebaseConfigured ? "Sign in to Firebase" : "Firebase setup required"}</button><button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
         </header>
 
         <div className="notice" role="status">{notice}</div>
