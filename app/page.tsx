@@ -34,6 +34,12 @@ type Version = {
   note?: string;
 };
 
+type ImportCandidate = {
+  document: JsonObject;
+  source: string;
+  warnings: string[];
+};
+
 const starterDocument = {
   type: "column",
   props: {
@@ -341,6 +347,7 @@ export default function StudioPage() {
   const [showSampleData, setShowSampleData] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [importText, setImportText] = useState("");
+  const [importCandidate, setImportCandidate] = useState<ImportCandidate | null>(null);
   const [selectedPath, setSelectedPath] = useState<number[]>([]);
   const [nestingTargetPath, setNestingTargetPath] = useState<number[] | null>(null);
   const [bindingTarget, setBindingTarget] = useState("value");
@@ -474,7 +481,19 @@ export default function StudioPage() {
     setNotice("New draft screen created. Give it a route, add content, then save a draft.");
   }
 
-  function importDocument() {
+  function inspectImport(document: JsonObject): string[] {
+    const warnings: string[] = [];
+    const walk = (node: JsonObject, path: string) => {
+      if (node.type === "image" && typeof node.props?.src !== "string") warnings.push(path + ": image has no source URL.");
+      if (node.type === "icon" && typeof node.props?.contentDescription !== "string") warnings.push(path + ": icon has no accessibility description.");
+      if (node.action?.type === "openUrl") warnings.push(path + ": web URLs must be approved by the production mobile host.");
+      node.children?.forEach((child, index) => walk(child, path + "/" + (child.type ?? "component") + "[" + index + "]"));
+    };
+    walk(document, document.type ?? "root");
+    return warnings;
+  }
+
+  function stageImport() {
     try {
       const imported = JSON.parse(importText) as JsonObject;
       const document = (imported.document && typeof imported.document === "object" ? imported.document : imported) as JsonObject;
@@ -483,13 +502,37 @@ export default function StudioPage() {
         setNotice("Import blocked: " + errors.join(" "));
         return;
       }
-      setJson(JSON.stringify(document, null, 2));
-      setShowImporter(false);
-      setImportText("");
-      setNotice("JSON imported successfully. Review the preview, then save it as a draft.");
+      const exporterWarnings = Array.isArray(imported.warnings) ? imported.warnings.filter((warning): warning is string => typeof warning === "string") : [];
+      setImportCandidate({ document, source: imported.document ? "Figma exporter" : "SDUI JSON", warnings: [...exporterWarnings, ...inspectImport(document)] });
+      setNotice("Import is valid and ready for review. Apply it only after checking the review panel.");
     } catch {
       setNotice("Import blocked: paste a complete JSON document from Studio or the Figma exporter.");
     }
+  }
+
+  function applyImport() {
+    if (!importCandidate) return;
+    setJson(JSON.stringify(importCandidate.document, null, 2));
+    setShowImporter(false);
+    setImportText("");
+    setImportCandidate(null);
+    setNotice("Import applied to the draft. Review its mobile preview, then save it as a new draft.");
+  }
+
+  function cancelImportReview() {
+    setImportCandidate(null);
+    setNotice("Import review dismissed. Your current draft is unchanged.");
+  }
+
+  function exportDocument(document: string, label: string) {
+    const file = new Blob([document], { type: "application/json" });
+    const url = URL.createObjectURL(file);
+    const anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = route + "-" + label.replace(/[^a-z0-9-]/gi, "-").toLowerCase() + ".json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Downloaded " + label + " as JSON.");
   }
 
   function restoreVersion(version: Version) {
@@ -740,10 +783,12 @@ export default function StudioPage() {
             </div>
 
             <div className="import-bar">
-              <div><strong>Import a document</strong><span>Paste JSON from the Figma exporter or an existing SDUI screen.</span></div>
+              <div><strong>Import or export a document</strong><span>Review Figma-export JSON safely, or download this draft as portable SDUI JSON.</span></div>
+              <div className="import-actions"><button className="secondary" onClick={() => exportDocument(json, "draft")}>Export draft</button>
               <button className="secondary" onClick={() => setShowImporter((value) => !value)}>{showImporter ? "Close import" : "Import JSON"}</button>
+              </div>
             </div>
-            {showImporter && <div className="importer"><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste SDUI JSON here…" /><button className="primary" onClick={importDocument}>Validate and import</button></div>}
+            {showImporter && <div className="importer"><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste SDUI JSON or Figma exporter output here…" /><button className="primary" onClick={stageImport}>Validate for review</button>{importCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{importCandidate.source}</strong><p>The incoming document is valid. Applying it replaces the editor draft, not any published version.</p></div><div className="import-review-grid"><div><small>Incoming JSON</small><pre>{JSON.stringify(importCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{importCandidate.warnings.length ? <ul>{importCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={cancelImportReview}>Keep current draft</button><button className="primary" onClick={applyImport}>Apply to draft</button></div></div>}</div>}
 
             <label className="json-label">Advanced document editor<textarea value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} /></label>
             {parsed.error && <p className="error-message">{parsed.error}</p>}
@@ -811,7 +856,7 @@ export default function StudioPage() {
               <p className={parsed.error ? "workflow-error" : "workflow-ok"}>{parsed.error ? "JSON, bindings, or actions need attention." : "Document validation passed."}</p>
               {showCompare && <div className="compare-panel"><strong>Current draft vs latest published</strong><div><pre>{(versions[selectedId] ?? []).find((version) => version.status === "Published")?.document ?? "No published version yet."}</pre><pre>{json}</pre></div></div>}
               <h2>Version history</h2>
-              {(versions[selectedId] ?? []).slice(0, 4).map((version) => <div className="version-row" key={version.id}><strong>v{version.number}</strong><span>{version.status}{version.note ? " · " + version.note : ""}</span><small>{version.createdAt}</small><button className="link-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}
+              {(versions[selectedId] ?? []).slice(0, 4).map((version) => <div className="version-row" key={version.id}><strong>v{version.number}</strong><span>{version.status}{version.note ? " · " + version.note : ""}</span><small>{version.createdAt}</small><div className="version-actions"><button className="link-button" onClick={() => restoreVersion(version)}>Restore</button><button className="link-button" onClick={() => exportDocument(version.document, "v" + version.number + "-" + version.status)}>Export</button></div></div>)}
               {!(versions[selectedId] ?? []).length && <p className="empty-state">No saved versions yet.</p>}
             </section>
           </aside>
@@ -826,3 +871,4 @@ export default function StudioPage() {
     </main>
   );
 }
+
