@@ -12,6 +12,7 @@
     "build:plugin": "node scripts/build-figma-plugin.mjs"
   },
   "dependencies": {
+    "firebase": "12.18.0",
     "next": "15.5.25",
     "react": "19.1.1",
     "react-dom": "19.1.1"
