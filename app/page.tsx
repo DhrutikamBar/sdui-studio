@@ -183,6 +183,14 @@ const bindings = [
   ["item.amountDisplay", "Transaction item / formatted amount"]
 ];
 
+const componentTemplates: Record<string, JsonObject> = {
+  text: { type: "text", props: { value: "New text", style: { color: "#142039", fontSize: 16 } } },
+  button: { type: "button", props: { label: "Continue" }, action: { type: "navigate", target: "home" } },
+  row: { type: "row", props: { style: { padding: "sm", arrangement: "spaceBetween" } }, children: [{ type: "text", props: { value: "Left label" } }, { type: "text", props: { value: "Right value" } }] },
+  card: { type: "box", props: { style: { padding: "md", background: "#FFFFFF", cornerRadius: 16 } }, children: [{ type: "text", props: { value: "Card title", style: { color: "#142039", fontWeight: "bold" } } }] },
+  spacer: { type: "spacer", props: { height: 16 } },
+};
+
 function getValue(path: string, source: Record<string, unknown>): unknown {
   return path.split(".").reduce<unknown>((value, segment) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -396,6 +404,21 @@ export default function StudioPage() {
     setNotice("Restored v" + version.number + " into the editor. Save it as a new draft before publishing.");
   }
 
+  function addComponent(kind: keyof typeof componentTemplates) {
+    if (parsed.error || !parsed.document) {
+      setNotice("Fix the document before adding a component.");
+      return;
+    }
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    document.children = [...(document.children ?? []), componentTemplates[kind]];
+    setJson(JSON.stringify(document, null, 2));
+    setNotice("Added a " + kind + " component. Edit its values in the JSON editor or preview it below.");
+  }
+
+  function outline(node: JsonObject, depth = 0): ReactNode {
+    return <div className="outline-node" key={node.id ?? (node.type ?? "unknown") + depth + Math.random()} style={{ paddingLeft: depth * 12 }}><span>{node.type ?? "unknown"}</span>{node.children?.map((child) => outline(child, depth + 1))}</div>;
+  }
+
   async function chooseScreen(screen: Screen) {
     setSelectedId(screen.id);
     setTitle(screen.title);
@@ -469,6 +492,14 @@ export default function StudioPage() {
           </section>
 
           <aside className="right-column">
+            <section className="card component-palette">
+              <div className="panel-heading compact"><div><h2>Visual builder</h2><p>Add a standard SDK component to the screen.</p></div></div>
+              <div className="palette-grid">
+                {Object.keys(componentTemplates).map((kind) => <button key={kind} onClick={() => addComponent(kind)}><strong>+ {kind}</strong><span>Add to root</span></button>)}
+              </div>
+              <div className="outline"><strong>Screen outline</strong>{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div>
+            </section>
+
             <section className="card">
               <div className="panel-heading compact"><div><h2>Approved data bindings</h2><p>Bindings come from API contracts, not arbitrary URLs.</p></div></div>
               <div className="binding-list">
