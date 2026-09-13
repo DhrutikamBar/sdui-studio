@@ -181,7 +181,8 @@ const bindings = [
   ["wallet.balanceDisplay", "Wallet summary / formatted balance"],
   ["transactions", "Transactions / list"],
   ["item.title", "Transaction item / title"],
-  ["item.amountDisplay", "Transaction item / formatted amount"]
+  ["item.amountDisplay", "Transaction item / formatted amount"],
+  ["item.amountColor", "Transaction item / amount color"]
 ];
 
 const componentTemplates: Record<string, JsonObject> = {
@@ -332,6 +333,8 @@ export default function StudioPage() {
   const [importText, setImportText] = useState("");
   const [selectedPath, setSelectedPath] = useState<number[]>([]);
   const [nestingTargetPath, setNestingTargetPath] = useState<number[] | null>(null);
+  const [bindingTarget, setBindingTarget] = useState("value");
+  const [bindingFilter, setBindingFilter] = useState("");
   const [versions, setVersions] = useState<Record<string, Version[]>>({
     wallet: [
       { id: "wallet-v12-draft", number: 12, status: "Draft", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Just now" },
@@ -484,6 +487,28 @@ export default function StudioPage() {
     });
   }
 
+  function bindableTargets(node: JsonObject | null) {
+    if (!node) return [] as Array<{ value: string; label: string }>;
+    const common = [{ value: "style.color", label: "Text color" }, { value: "style.background", label: "Background color" }];
+    if (node.type === "text") return [{ value: "value", label: "Text value" }, ...common];
+    if (node.type === "button" || node.type === "chip") return [{ value: "label", label: "Label" }, ...common];
+    if (node.type === "image") return [{ value: "src", label: "Image URL" }, { value: "contentDescription", label: "Accessibility description" }];
+    if (node.type === "icon") return [{ value: "name", label: "Icon name" }, { value: "contentDescription", label: "Accessibility description" }, ...common];
+    if (node.type === "textInput") return [{ value: "label", label: "Label" }, { value: "placeholder", label: "Placeholder" }, ...common];
+    return common;
+  }
+
+  function applyBinding(path: string) {
+    if (!selectedNode) {
+      setNotice("Select a component before applying a data binding.");
+      return;
+    }
+    const value = "{{" + path + "}}";
+    if (bindingTarget.startsWith("style.")) setSelectedStyle(bindingTarget.slice(6), value);
+    else setSelectedProp(bindingTarget, value);
+    setNotice("Bound " + bindingTarget + " to " + value + ".");
+  }
+
   function deleteSelectedNode() {
     if (!selectedPath.length || !parsed.document) return;
     const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
@@ -568,7 +593,7 @@ export default function StudioPage() {
 
   function outline(node: JsonObject, path: number[] = [], depth = 0): ReactNode {
     const isSelected = path.length === selectedPath.length && path.every((value, index) => value === selectedPath[index]);
-    return <div className="outline-node" key={node.id ?? (path.join("-") || "root")} style={{ paddingLeft: depth * 12 }}><button className={isSelected ? "outline-selected" : ""} onClick={() => setSelectedPath(path)}>{node.type ?? "unknown"}</button>{node.children?.map((child, index) => outline(child, [...path, index], depth + 1))}</div>;
+    return <div className="outline-node" key={node.id ?? (path.join("-") || "root")} style={{ paddingLeft: depth * 12 }}><button className={isSelected ? "outline-selected" : ""} onClick={() => { setSelectedPath(path); setBindingTarget(bindableTargets(node)[0]?.value ?? "style.color"); }}>{node.type ?? "unknown"}</button>{node.children?.map((child, index) => outline(child, [...path, index], depth + 1))}</div>;
   }
 
   const selectedNode = parsed.document ? nodeAtPath(parsed.document, selectedPath) : null;
@@ -682,22 +707,18 @@ export default function StudioPage() {
             </section>}
 
             <section className="card">
-              <div className="panel-heading compact"><div><h2>Approved data bindings</h2><p>Bindings come from API contracts, not arbitrary URLs.</p></div></div>
-              <div className="binding-list">
-                {bindings.map(([path, description]) => (
-                  <button
-                    key={path}
-                    onClick={() => {
-                      if (navigator.clipboard) {
-                        void navigator.clipboard.writeText("{{" + path + "}}");
-                      }
-                      setNotice("Copied {{" + path + "}}. Paste it into the document.");
-                    }}
-                  >
-                    <strong>{"{{" + path + "}}"}</strong><span>{description}</span>
-                  </button>
-                ))}
-              </div>
+              <div className="panel-heading compact"><div><h2>Data binding</h2><p>Connect a selected property to an approved API field.</p></div></div>
+              {selectedNode ? <>
+                <label>Bind to property<select value={bindingTarget} onChange={(event) => setBindingTarget(event.target.value)}>{bindableTargets(selectedNode).map((target) => <option key={target.value} value={target.value}>{target.label}</option>)}</select></label>
+                <input className="binding-filter" value={bindingFilter} onChange={(event) => setBindingFilter(event.target.value)} placeholder="Filter API fields…" />
+                <div className="binding-list">
+                  {bindings.filter(([path, description]) => (path + " " + description).toLowerCase().includes(bindingFilter.toLowerCase())).map(([path, description]) => {
+                    const sample = getValue(path, sampleData);
+                    return <button key={path} onClick={() => applyBinding(path)}><strong>{"{{" + path + "}}"}</strong><span>{description}</span><small>{Array.isArray(sample) ? sample.length + " sample items" : "Sample: " + String(sample ?? "not available")}</small></button>;
+                  })}
+                </div>
+                <button className="clear-binding" onClick={() => bindingTarget.startsWith("style.") ? setSelectedStyle(bindingTarget.slice(6), "") : setSelectedProp(bindingTarget, "")}>Clear selected binding</button>
+              </> : <p className="empty-state">Select a component in the screen outline to choose a property and bind it.</p>}
             </section>
 
             <section className="card">
