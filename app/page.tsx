@@ -324,7 +324,7 @@ export default function StudioPage() {
     }));
     if (firebaseUser) {
       try {
-        await saveRemoteVersion({ id: selectedId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json });
+        await saveRemoteVersion({ screenId: selectedId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json });
         setNotice("Draft snapshot saved to Firestore.");
       } catch (error) {
         setNotice("Local draft saved, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
@@ -349,7 +349,7 @@ export default function StudioPage() {
     }));
     if (firebaseUser) {
       try {
-        await saveRemoteVersion({ id: selectedId, number: nextVersion, status: "Published", title, route, document: json });
+        await saveRemoteVersion({ screenId: selectedId, number: nextVersion, status: "Published", title, route, document: json });
         setNotice("Published v" + nextVersion + " to Firestore.");
       } catch (error) {
         setNotice("Local version published, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
