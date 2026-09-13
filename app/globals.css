@@ -39,6 +39,7 @@ nav { display: grid; gap: 4px; }
 h1 { margin: 0; font-size: 30px; letter-spacing: -.04em; }
 h2 { font-size: 16px; margin: 0; letter-spacing: -.015em; }
 .top-actions { display: flex; gap: 9px; }
+.firebase-state { border: 1px solid #cbd9ff; color: #304a93; background: #f4f7ff; border-radius: 8px; padding: 10px 12px; font-size: 12px; font-weight: 750; }
 .primary, .secondary { border-radius: 8px; padding: 10px 14px; font-weight: 750; border: 1px solid var(--line); }
 .primary { color: #fff; background: var(--brand); border-color: var(--brand); }
 .secondary { color: #364152; background: #fff; }
