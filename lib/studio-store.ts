@@ -35,20 +35,23 @@ export async function loadRemoteVersions(screenId: string): Promise<RemoteVersio
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as RemoteVersion));
 }
 
-export async function saveRemoteVersion(input: Omit<RemoteVersion, "id" | "createdAt">) {
+export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt"> & { screenId: string };
+
+export async function saveRemoteVersion(input: SaveRemoteVersionInput) {
   const db = firestore();
   if (!db) throw new Error("Firebase is not configured.");
   const createdAt = Date.now();
   const versionId = input.status.toLowerCase() + "-" + createdAt;
-  await setDoc(doc(db, "sduiScreens", input.id), {
+  await setDoc(doc(db, "sduiScreens", input.screenId), {
     title: input.title,
     route: input.route,
     status: input.status,
     version: input.number,
     updatedAt: createdAt,
   }, { merge: true });
-  await setDoc(doc(db, "sduiScreens", input.id, "versions", versionId), {
-    ...input,
+  const { screenId, ...version } = input;
+  await setDoc(doc(db, "sduiScreens", screenId, "versions", versionId), {
+    ...version,
     createdAt,
   });
 }
