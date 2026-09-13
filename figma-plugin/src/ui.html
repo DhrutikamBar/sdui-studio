@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 20px; font: 13px/1.45 Inter, sans-serif; color: var(--figma-color-text); background: var(--figma-color-bg); }
+      h1 { font-size: 18px; margin: 0 0 6px; }
+      h2 { font-size: 13px; margin: 18px 0 8px; }
+      p { margin: 0 0 12px; color: var(--figma-color-text-secondary); }
+      .selection { padding: 10px; border-radius: 8px; background: var(--figma-color-bg-secondary); margin: 12px 0; }
+      .selection strong { display: block; color: var(--figma-color-text); }
+      button { border: 0; border-radius: 7px; padding: 9px 12px; font-weight: 600; cursor: pointer; }
+      button.primary { color: white; background: var(--figma-color-bg-brand); }
+      button.secondary { color: var(--figma-color-text); background: var(--figma-color-bg-secondary); margin-left: 8px; }
+      pre { max-height: 250px; overflow: auto; margin: 0; padding: 12px; border-radius: 8px; white-space: pre-wrap; background: var(--figma-color-bg-secondary); color: var(--figma-color-text); }
+      ul { margin: 0; padding-left: 18px; color: var(--figma-color-text-secondary); }
+      .hint { font-size: 12px; margin-top: 14px; padding: 10px; border-left: 3px solid var(--figma-color-border-brand-strong); background: var(--figma-color-bg-secondary); }
+      .error { color: var(--figma-color-text-danger); margin-top: 10px; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>SDUI Figma Exporter</h1>
+    <p>Convert one selected frame into a starting SDUI document. Review the result before publishing it.</p>
+
+    <div class="selection" id="selection">Choose a frame, component, or group in Figma.</div>
+    <button class="primary" id="convert">Convert selection</button>
+    <button class="secondary" id="copy" disabled>Copy JSON</button>
+    <p class="error hidden" id="error"></p>
+
+    <section id="result" class="hidden">
+      <h2>SDUI JSON</h2>
+      <pre id="json"></pre>
+      <h2 id="warningsTitle">Conversion notes</h2>
+      <ul id="warnings"></ul>
+    </section>
+
+    <div class="hint">
+      Naming conventions: <strong>sdui:button</strong>, <strong>route:wallet</strong>,
+      <strong>bind:user.name</strong>, and <strong>sdui:repeater:transactions</strong>.
+      Auto-layout maps to rows and columns.
+    </div>
+
+    <script>
+      const selection = document.getElementById("selection");
+      const convert = document.getElementById("convert");
+      const copy = document.getElementById("copy");
+      const error = document.getElementById("error");
+      const result = document.getElementById("result");
+      const output = document.getElementById("json");
+      const warnings = document.getElementById("warnings");
+      const warningsTitle = document.getElementById("warningsTitle");
+      let latestJson = "";
+
+      convert.onclick = () => {
+        error.classList.add("hidden");
+        parent.postMessage({ pluginMessage: { type: "convert-selection" } }, "*");
+      };
+
+      copy.onclick = async () => {
+        await navigator.clipboard.writeText(latestJson);
+        copy.textContent = "Copied";
+        setTimeout(() => { copy.textContent = "Copy JSON"; }, 1200);
+      };
+
+      onmessage = (event) => {
+        const message = event.data.pluginMessage;
+        if (!message) return;
+
+        if (message.type === "selection") {
+          selection.innerHTML = message.selection
+            ? "<strong>" + escapeHtml(message.selection.name) + "</strong>" + escapeHtml(message.selection.type) + " selected"
+            : "Choose a frame, component, or group in Figma.";
+        }
+
+        if (message.type === "conversion-error") {
+          error.textContent = message.message;
+          error.classList.remove("hidden");
+        }
+
+        if (message.type === "conversion") {
+          latestJson = JSON.stringify(message.result.document, null, 2);
+          output.textContent = latestJson;
+          copy.disabled = false;
+          result.classList.remove("hidden");
+          warnings.replaceChildren();
+          const notes = message.result.warnings || [];
+          warningsTitle.textContent = notes.length ? "Conversion notes (" + notes.length + ")" : "Conversion notes";
+          if (!notes.length) {
+            const item = document.createElement("li");
+            item.textContent = "No unsupported layers were found.";
+            warnings.appendChild(item);
+          } else {
+            notes.forEach((note) => {
+              const item = document.createElement("li");
+              item.textContent = note.nodeName + ": " + note.message;
+              warnings.appendChild(item);
+            });
+          }
+        }
+      };
+
+      function escapeHtml(value) {
+        const element = document.createElement("div");
+        element.textContent = value;
+        return element.innerHTML;
+      }
+    </script>
+  </body>
+</html>
