@@ -43,6 +43,15 @@ nav { display: grid; gap: 4px; }
 h1 { margin: 0; font-size: 30px; letter-spacing: -.04em; }
 h2 { font-size: 16px; margin: 0; letter-spacing: -.015em; }
 .top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.sync-state { display: flex; align-items: center; gap: 6px; padding: 7px 9px; color: #667085; background: rgba(255,255,255,.68); border: 1px solid #e1e5ed; border-radius: 9px; }
+.sync-state span { font-size: 14px; line-height: 1; }
+.sync-state small { font-size: 10px; font-weight: 750; white-space: nowrap; }
+.sync-state.local span { color: #8b94a7; }
+.sync-state.syncing span { color: #635bff; animation: sync-pulse 1s ease-in-out infinite alternate; }
+.sync-state.saved { color: #217a4c; border-color: #d5f0df; background: #f3fcf6; }
+.sync-state.saved span { color: #1e9a57; }
+.sync-state.failed { color: #aa5218; border-color: #f3d7bf; background: #fff8f3; }
+@keyframes sync-pulse { from { opacity: .45; } to { opacity: 1; } }
 .firebase-state { border: 1px solid #d9ddf7; color: #4f46a5; background: rgba(255,255,255,.72); border-radius: 9px; padding: 10px 12px; font-size: 12px; font-weight: 750; }
 .primary, .secondary { border-radius: 9px; padding: 10px 14px; font-weight: 750; border: 1px solid var(--line); transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
 .primary { color: #fff; background: linear-gradient(135deg, #746bff, #564ce7); border-color: transparent; box-shadow: 0 8px 16px rgba(89, 78, 231, .20); }
