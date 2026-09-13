@@ -20,6 +20,16 @@ type Screen = {
   updatedAt: string;
 };
 
+type Version = {
+  id: string;
+  number: number;
+  status: "Draft" | "Published";
+  title: string;
+  route: string;
+  document: string;
+  createdAt: string;
+};
+
 const starterDocument = {
   type: "column",
   props: {
@@ -268,6 +278,14 @@ export default function StudioPage() {
   const [json, setJson] = useState(JSON.stringify(starterDocument, null, 2));
   const [notice, setNotice] = useState("Draft loaded. Make a change, preview it, then publish.");
   const [showSampleData, setShowSampleData] = useState(false);
+  const [showImporter, setShowImporter] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [versions, setVersions] = useState<Record<string, Version[]>>({
+    wallet: [
+      { id: "wallet-v12-draft", number: 12, status: "Draft", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Just now" },
+      { id: "wallet-v11", number: 11, status: "Published", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Today, 10:24" }
+    ]
+  });
 
   const parsed = useMemo(() => {
     try {
@@ -287,7 +305,11 @@ export default function StudioPage() {
     setScreens((current) => current.map((screen) =>
       screen.id === selectedId ? { ...screen, title, route, status: "Draft", updatedAt: "Just now" } : screen
     ));
-    setNotice("Draft saved locally. Connect Firestore publishing in the next backend step.");
+    setVersions((current) => ({
+      ...current,
+      [selectedId]: [{ id: selectedId + "-draft-" + Date.now(), number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json, createdAt: "Just now" }, ...(current[selectedId] ?? [])]
+    }));
+    setNotice("Draft snapshot saved locally. It is ready to be stored in Firestore once Firebase is connected.");
   }
 
   function publish() {
@@ -295,12 +317,52 @@ export default function StudioPage() {
       setNotice("Publishing blocked: the document JSON is invalid.");
       return;
     }
+    const nextVersion = (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1;
     setScreens((current) => current.map((screen) =>
-      screen.id === selectedId
-        ? { ...screen, title, route, status: "Published", version: screen.version + 1, updatedAt: "Just now" }
-        : screen
+      screen.id === selectedId ? { ...screen, title, route, status: "Published", version: nextVersion, updatedAt: "Just now" } : screen
     ));
-    setNotice("Published locally as a new immutable version. A production publish endpoint will validate and write this document.");
+    setVersions((current) => ({
+      ...current,
+      [selectedId]: [{ id: selectedId + "-v" + nextVersion, number: nextVersion, status: "Published", title, route, document: json, createdAt: "Just now" }, ...(current[selectedId] ?? [])]
+    }));
+    setNotice("Published locally as v" + nextVersion + ". In Firebase mode this becomes an immutable published document for the mobile SDK.");
+  }
+
+  function createScreen() {
+    const name = "New screen";
+    const id = "screen-" + Date.now();
+    const newScreen: Screen = { id, route: "new-screen", title: name, status: "Draft", version: 0, updatedAt: "Just now" };
+    setScreens((current) => [...current, newScreen]);
+    setSelectedId(id);
+    setTitle(name);
+    setRoute("new-screen");
+    setJson(JSON.stringify({ type: "column", props: { style: { padding: "md" } }, children: [] }, null, 2));
+    setNotice("New draft screen created. Give it a route, add content, then save a draft.");
+  }
+
+  function importDocument() {
+    try {
+      const imported = JSON.parse(importText) as JsonObject;
+      const document = (imported.document && typeof imported.document === "object" ? imported.document : imported) as JsonObject;
+      const errors = validateSduiDocument(document);
+      if (errors.length) {
+        setNotice("Import blocked: " + errors.join(" "));
+        return;
+      }
+      setJson(JSON.stringify(document, null, 2));
+      setShowImporter(false);
+      setImportText("");
+      setNotice("JSON imported successfully. Review the preview, then save it as a draft.");
+    } catch {
+      setNotice("Import blocked: paste a complete JSON document from Studio or the Figma exporter.");
+    }
+  }
+
+  function restoreVersion(version: Version) {
+    setTitle(version.title);
+    setRoute(version.route);
+    setJson(version.document);
+    setNotice("Restored v" + version.number + " into the editor. Save it as a new draft before publishing.");
   }
 
   function chooseScreen(screen: Screen) {
@@ -314,7 +376,7 @@ export default function StudioPage() {
     <main>
       <aside className="sidebar">
         <div className="brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Control centre</small></div></div>
-        <button className="new-screen" onClick={() => setNotice("New-screen creation will be connected to persistent storage next.")}>+ New screen</button>
+        <button className="new-screen" onClick={createScreen}>+ New screen</button>
         <p className="sidebar-label">SCREENS</p>
         <nav>
           {screens.map((screen) => (
@@ -342,6 +404,12 @@ export default function StudioPage() {
               <label>Screen name<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
               <label>Route<input value={route} onChange={(event) => setRoute(event.target.value.replace(/\s/g, "-"))} /></label>
             </div>
+
+            <div className="import-bar">
+              <div><strong>Import a document</strong><span>Paste JSON from the Figma exporter or an existing SDUI screen.</span></div>
+              <button className="secondary" onClick={() => setShowImporter((value) => !value)}>{showImporter ? "Close import" : "Import JSON"}</button>
+            </div>
+            {showImporter && <div className="importer"><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste SDUI JSON here…" /><button className="primary" onClick={importDocument}>Validate and import</button></div>}
 
             <label className="json-label">Advanced document editor<textarea value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} /></label>
             {parsed.error && <p className="error-message">{parsed.error}</p>}
@@ -376,9 +444,8 @@ export default function StudioPage() {
 
             <section className="card versions">
               <h2>Version history</h2>
-              <div><strong>v{screens.find((screen) => screen.id === selectedId)?.version}</strong><span>Current draft</span><small>Just now</small></div>
-              <div><strong>v11</strong><span>Published</span><small>Today, 10:24</small></div>
-              <button className="link-button" onClick={() => setNotice("Rollback is intentionally disabled until versions are stored server-side.")}>View and rollback versions →</button>
+              {(versions[selectedId] ?? []).slice(0, 4).map((version) => <div className="version-row" key={version.id}><strong>v{version.number}</strong><span>{version.status}</span><small>{version.createdAt}</small><button className="link-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}
+              {!(versions[selectedId] ?? []).length && <p className="empty-state">No saved versions yet.</p>}
             </section>
           </aside>
         </div>
