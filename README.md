@@ -11,7 +11,7 @@ It also contains a focused **Figma-to-SDUI exporter**: a local Figma development
 - Approved data-binding picker and sample response panel
 - Mobile-shaped preview
 - Draft, publish, and rollback interactions
-- Local-first storage model ready to be replaced by a Firestore adapter
+- Local-first editing with optional shared Firestore drafts and versions
 - Selected-frame Figma export with conversion notes
 
 ## Figma exporter
@@ -46,6 +46,33 @@ In the Figma desktop app:
 
 Studio manages layouts and approved binding paths only. It does not store API credentials or permit arbitrary API endpoint calls. A production publish endpoint must validate schema, roles, capabilities, and action policies before writing a published screen document.
 
+## Shared Firestore workspace
+
+Studio works locally until a user signs in. After Google sign-in, the top bar shows one of four clear states: local-only, saving, shared-and-saved, or shared-sync-failed.
+
+The shared data structure is:
+
+```text
+sduiScreens/{screenId}                    screen metadata
+sduiScreens/{screenId}/versions/{version} immutable draft or published document
+studioUsers/{firebaseUid}                 role record
+```
+
+`firestore.rules` is deliberately secure by default. Add each approved Firebase Authentication user to the `studioUsers` collection from the Firebase Console before using Studio:
+
+```json
+// Document ID: the user's Firebase Authentication UID
+{ "role": "admin" }
+```
+
+Available roles are:
+
+- `designer`: read, save drafts, and publish versions.
+- `reviewer`: read-only access.
+- `admin`: designer permissions plus user-role administration and delete/rollback support.
+
+Deploy `firestore.rules` from the Firebase Console or Firebase CLI before enabling shared use. Do not replace it with public `allow read, write: if true` rules.
+
 ## Run the Studio locally
 
 ```bash
@@ -54,3 +81,4 @@ npm run dev
 ```
 
 Then open the localhost link shown in the terminal.
+
