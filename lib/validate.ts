@@ -36,6 +36,12 @@ export function validateSduiDocument(value: unknown): string[] {
     if (valueNode.action?.type && !actionTypes.has(valueNode.action.type)) {
       errors.push(path + " has an unsupported action type.");
     }
+    if (valueNode.action?.type && ["navigate", "analytics", "refreshData", "openUrl", "toggleState"].includes(valueNode.action.type) && !valueNode.action.target?.trim()) {
+      errors.push(path + " action requires a target.");
+    }
+    if (valueNode.action?.type === "openUrl" && valueNode.action.target && !valueNode.action.target.startsWith("https://")) {
+      errors.push(path + " URL actions must use HTTPS.");
+    }
 
     const serialized = JSON.stringify(valueNode);
     const bindings = serialized.matchAll(/\{\{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*\}\}/g);
