@@ -123,8 +123,10 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
 .preview-copy h2 { font-size: 28px; margin-bottom: 12px; letter-spacing: -.035em; }
 .preview-copy > p:not(.eyebrow) { color: #596377; line-height: 1.55; font-size: 14px; }
 .preview-state { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 19px; }
-.preview-state span { color: #667085; background: #fff; border: 1px solid #dde1ee; border-radius: 999px; padding: 6px 10px; font-size: 12px; }
-.preview-state .state-active { color: #fff; background: #5149e5; border-color: #5149e5; }
+.preview-state button, .scenario-picker button { color: #667085; background: #fff; border: 1px solid #dde1ee; border-radius: 999px; padding: 6px 10px; font-size: 12px; }
+.preview-state .state-active, .scenario-picker .selected { color: #fff; background: #5149e5; border-color: #5149e5; }
+.scenario-picker { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 16px; }
+.scenario-picker button { font-size: 11px; }
 .phone-shell { width: 244px; height: 462px; padding: 11px 9px 10px; border: 7px solid #1a2132; border-radius: 30px; box-shadow: 0 22px 50px rgba(38, 45, 92, .25); background: #1a2132; }
 .phone-status { display: flex; justify-content: space-between; color: white; font-size: 9px; padding: 0 5px 6px; background: #10265D; }
 .phone-screen { height: 401px; overflow: auto; background: #10265D; color: white; font-size: 12px; }
@@ -141,6 +143,15 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
 .preview-tabs span, .preview-bottom-nav span { flex: 1; padding: 6px 3px; color: #cad5f0; border-bottom: 2px solid transparent; font-size: 10px; text-align: center; white-space: nowrap; }
 .preview-tabs .selected, .preview-bottom-nav .selected { color: #fff; border-color: #c7c3ff; }
 .preview-bottom-nav { padding: 7px 0 0; border-top: 1px solid rgba(255,255,255,.2); }
+.preview-loading { display: grid; gap: 10px; padding: 20px 12px; }
+.preview-loading i { display: block; height: 16px; border-radius: 5px; background: linear-gradient(90deg, #21366f, #31477f, #21366f); }
+.preview-loading i:nth-child(2) { width: 72%; }
+.preview-loading i:nth-child(3) { height: 74px; }
+.preview-loading i:nth-child(4) { width: 55%; }
+.preview-message { display: grid; gap: 8px; place-items: center; align-content: center; min-height: 270px; padding: 28px; text-align: center; }
+.preview-message strong { font-size: 15px; }
+.preview-message span { color: #cad5f0; font-size: 11px; line-height: 1.4; }
+.preview-message button { border: 0; border-radius: 16px; padding: 8px 13px; color: #242142; background: #c7c3ff; font-weight: 800; }
 .phone-home { height: 11px; width: 78px; background: #fff; margin: 8px auto 0; border-radius: 999px; opacity: .85; }
 
 @media (max-width: 980px) {
