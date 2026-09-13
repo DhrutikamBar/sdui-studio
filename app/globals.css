@@ -54,6 +54,11 @@ h2 { font-size: 16px; margin: 0; letter-spacing: -.015em; }
 .valid { color: var(--success); background: #e8f7ef; }
 .invalid { color: #b42318; background: #fff0ef; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 17px; }
+.import-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px; margin: 0 0 17px; border: 1px solid #dfe3ff; border-radius: 8px; background: #f8f8ff; }
+.import-bar strong { display: block; color: #353178; font-size: 13px; }
+.import-bar span { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.importer { margin: -5px 0 17px; padding: 12px; border: 1px solid #dfe3ff; border-radius: 8px; background: #fbfbff; }
+.importer textarea { display: block; min-height: 180px; width: 100%; margin-bottom: 10px; background: #111827; }
 label { display: grid; gap: 6px; color: #475467; font-size: 12px; font-weight: 700; }
 input { color: var(--ink); background: #fff; border: 1px solid #d6dce6; border-radius: 7px; outline: 0; padding: 10px; }
 input:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px #ecebff; }
@@ -76,6 +81,10 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
 .versions span { color: #475467; }
 .versions small { grid-column: 2; color: #98a2b3; }
 .link-button { margin-top: 12px; padding: 0; color: #5149e5; background: transparent; border: 0; font-size: 12px; font-weight: 800; }
+.versions .version-row { grid-template-columns: 36px 1fr auto; align-items: center; }
+.versions .version-row small { grid-column: 2; }
+.versions .version-row .link-button { grid-column: 3; grid-row: 1 / span 2; margin: 0; }
+.empty-state { color: var(--muted); font-size: 12px; margin: 0; }
 
 .preview-section { margin-top: 26px; background: linear-gradient(115deg, #e8ebff, #f8f9ff); min-height: 470px; border: 1px solid #dbe0ff; border-radius: 14px; padding: 40px clamp(24px, 7vw, 100px); display: flex; align-items: center; justify-content: space-around; gap: 42px; }
 .preview-copy { max-width: 370px; }
