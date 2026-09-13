@@ -77,6 +77,7 @@ textarea { min-height: 670px; resize: vertical; border-radius: 8px; padding: 15p
 .palette-grid span { color: var(--muted); font-size: 10px; margin-top: 2px; }
 .outline { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line); color: #475467; font-size: 11px; }
 .outline > strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 12px; }
+.nesting-target { display: inline-block; margin: -2px 0 7px; padding: 3px 6px; color: #4d46df; background: #eeedff; border-radius: 4px; font-size: 10px; font-family: ui-monospace, monospace; }
 .outline-node { border-left: 1px solid #e3e5ed; margin: 3px 0; line-height: 1.35; }
 .outline-node > button { display: inline-block; padding: 3px 7px; color: #667085; background: transparent; border: 0; border-radius: 5px; font-family: ui-monospace, monospace; font-size: 11px; }
 .outline-node > button:hover, .outline-node > .outline-selected { color: #4d46df; background: #eeedff; }
@@ -85,6 +86,11 @@ textarea { min-height: 670px; resize: vertical; border-radius: 8px; padding: 15p
 .property-editor input, .property-editor select { width: 100%; }
 .danger-link { border: 0; color: #b42318; background: transparent; padding: 0; font-size: 12px; font-weight: 750; }
 .property-editor code { color: #4d46df; }
+.layout-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.layout-actions button, .nest-button { border: 1px solid #dfe3ef; border-radius: 6px; padding: 7px; color: #475467; background: #fff; font-size: 11px; font-weight: 700; }
+.layout-actions button:hover, .nest-button:hover { color: #4d46df; border-color: #cfcaff; background: #f8f7ff; }
+.layout-actions button:disabled { cursor: not-allowed; opacity: .45; }
+.nest-button { width: 100%; color: #4d46df; border-color: #d8d4ff; background: #f8f7ff; }
 .binding-list { display: grid; gap: 5px; }
 .binding-list button { background: #fff; border: 1px solid transparent; border-radius: 7px; text-align: left; padding: 8px; display: grid; gap: 3px; color: #475467; }
 .binding-list button:hover { border-color: #d9d7ff; background: #f7f6ff; }
