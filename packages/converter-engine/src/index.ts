@@ -13,7 +13,7 @@ export interface FigmaLikeNode {
   type: string;
   visible?: boolean;
   characters?: string;
-  layoutMode?: "NONE" | "HORIZONTAL" | "VERTICAL";
+  layoutMode?: string;
   children?: FigmaLikeNode[];
   fills?: FigmaLikePaint[];
   cornerRadius?: number;
