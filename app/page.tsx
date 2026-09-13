@@ -18,7 +18,7 @@ type Screen = {
   id: string;
   route: string;
   title: string;
-  status: "Draft" | "Published";
+  status: "Draft" | "Published" | "Archived";
   version: number;
   updatedAt: string;
 };
@@ -31,6 +31,7 @@ type Version = {
   route: string;
   document: string;
   createdAt: string;
+  note?: string;
 };
 
 const starterDocument = {
@@ -346,6 +347,11 @@ export default function StudioPage() {
   const [bindingFilter, setBindingFilter] = useState("");
   const [previewState, setPreviewState] = useState("content");
   const [sampleScenario, setSampleScenario] = useState("standard");
+  const [showArchived, setShowArchived] = useState(false);
+  const [publishNote, setPublishNote] = useState("");
+  const [previewConfirmed, setPreviewConfirmed] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState<Version | null>(null);
   const [versions, setVersions] = useState<Record<string, Version[]>>({
     wallet: [
       { id: "wallet-v12-draft", number: 12, status: "Draft", title: "Wallet", route: "wallet", document: JSON.stringify(starterDocument, null, 2), createdAt: "Just now" },
@@ -403,13 +409,21 @@ export default function StudioPage() {
       setNotice("Publishing blocked: the document JSON is invalid.");
       return;
     }
+    if (!previewConfirmed) {
+      setNotice("Publishing blocked: confirm that you tested the preview states.");
+      return;
+    }
+    if (!publishNote.trim()) {
+      setNotice("Publishing blocked: add a short release note.");
+      return;
+    }
     const nextVersion = (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1;
     setScreens((current) => current.map((screen) =>
       screen.id === selectedId ? { ...screen, title, route, status: "Published", version: nextVersion, updatedAt: "Just now" } : screen
     ));
     setVersions((current) => ({
       ...current,
-      [selectedId]: [{ id: selectedId + "-v" + nextVersion, number: nextVersion, status: "Published", title, route, document: json, createdAt: "Just now" }, ...(current[selectedId] ?? [])]
+      [selectedId]: [{ id: selectedId + "-v" + nextVersion, number: nextVersion, status: "Published", title, route, document: json, createdAt: "Just now", note: publishNote.trim() }, ...(current[selectedId] ?? [])]
     }));
     if (firebaseUser) {
       try {
@@ -421,6 +435,31 @@ export default function StudioPage() {
     } else {
       setNotice(isFirebaseConfigured ? "Local version published. Sign in before publishing to Firestore." : "Published locally as v" + nextVersion + ". Add Firebase environment variables to publish for the mobile SDK.");
     }
+    setPublishNote("");
+    setPreviewConfirmed(false);
+  }
+
+  function duplicateScreen() {
+    const id = selectedId + "-copy-" + Date.now();
+    const copy: Screen = { id, title: title + " copy", route: route + "-copy", status: "Draft", version: 0, updatedAt: "Just now" };
+    setScreens((current) => [...current, copy]);
+    setSelectedId(id);
+    setTitle(copy.title);
+    setRoute(copy.route);
+    setVersions((current) => ({ ...current, [id]: [{ id: id + "-draft", number: 0, status: "Draft", title: copy.title, route: copy.route, document: json, createdAt: "Just now", note: "Copied from " + selectedId }] }));
+    setNotice("Created a draft copy. Give it a unique route before publishing.");
+  }
+
+  function archiveScreen() {
+    setScreens((current) => current.map((screen) => screen.id === selectedId ? { ...screen, status: "Archived", updatedAt: "Just now" } : screen));
+    const next = screens.find((screen) => screen.id !== selectedId && screen.status !== "Archived");
+    if (next) void chooseScreen(next);
+    setNotice("Screen archived. Enable archived screens in the sidebar to restore it.");
+  }
+
+  function restoreArchivedScreen() {
+    setScreens((current) => current.map((screen) => screen.id === selectedId ? { ...screen, status: "Draft", updatedAt: "Just now" } : screen));
+    setNotice("Screen restored as a draft.");
   }
 
   function createScreen() {
@@ -454,10 +493,17 @@ export default function StudioPage() {
   }
 
   function restoreVersion(version: Version) {
+    setPendingRestore(version);
+  }
+
+  function confirmRestoreVersion() {
+    if (!pendingRestore) return;
+    const version = pendingRestore;
     setTitle(version.title);
     setRoute(version.route);
     setJson(version.document);
     setNotice("Restored v" + version.number + " into the editor. Save it as a new draft before publishing.");
+    setPendingRestore(null);
   }
 
   function addComponent(kind: keyof typeof componentTemplates) {
@@ -665,11 +711,11 @@ export default function StudioPage() {
       <aside className="sidebar">
         <div className="brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Control centre</small></div></div>
         <button className="new-screen" onClick={createScreen}>+ New screen</button>
-        <p className="sidebar-label">SCREENS</p>
+        <div className="sidebar-label-row"><p className="sidebar-label">SCREENS</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Show archived"}</button></div>
         <nav>
-          {screens.map((screen) => (
+          {screens.filter((screen) => showArchived || screen.status !== "Archived").map((screen) => (
             <button key={screen.id} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => chooseScreen(screen)}>
-              <span>{screen.title}</span><em className={screen.status === "Published" ? "published" : "draft"}>{screen.status}</em>
+              <span>{screen.title}</span><em className={screen.status === "Published" ? "published" : screen.status === "Archived" ? "archived" : "draft"}>{screen.status}</em>
             </button>
           ))}
         </nav>
@@ -679,7 +725,7 @@ export default function StudioPage() {
       <section className="workspace">
         <header className="topbar">
           <div><p className="eyebrow">SCREENS / {route.toUpperCase()}</p><h1>{title}</h1></div>
-          <div className="top-actions"><button className="firebase-state" onClick={toggleStudioSignIn}>{firebaseUser ? "● " + (firebaseUser.displayName ?? firebaseUser.email ?? "Signed in") : isFirebaseConfigured ? "Sign in to Firebase" : "Firebase setup required"}</button><button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
+          <div className="top-actions"><button className="firebase-state" onClick={toggleStudioSignIn}>{firebaseUser ? "● " + (firebaseUser.displayName ?? firebaseUser.email ?? "Signed in") : isFirebaseConfigured ? "Sign in to Firebase" : "Firebase setup required"}</button><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
         </header>
 
         <div className="notice" role="status">{notice}</div>
@@ -759,8 +805,13 @@ export default function StudioPage() {
             </section>
 
             <section className="card versions">
+              <div className="panel-heading compact"><div><h2>Release workflow</h2><p>Publish only after validation and preview review.</p></div><button className="link-button" onClick={() => setShowCompare((value) => !value)}>Compare</button></div>
+              <label>Release note<input value={publishNote} placeholder="What changed in this version?" onChange={(event) => setPublishNote(event.target.value)} /></label>
+              <label className="check-label"><input type="checkbox" checked={previewConfirmed} onChange={(event) => setPreviewConfirmed(event.target.checked)} /> I tested content, loading, empty, and error previews</label>
+              <p className={parsed.error ? "workflow-error" : "workflow-ok"}>{parsed.error ? "JSON, bindings, or actions need attention." : "Document validation passed."}</p>
+              {showCompare && <div className="compare-panel"><strong>Current draft vs latest published</strong><div><pre>{(versions[selectedId] ?? []).find((version) => version.status === "Published")?.document ?? "No published version yet."}</pre><pre>{json}</pre></div></div>}
               <h2>Version history</h2>
-              {(versions[selectedId] ?? []).slice(0, 4).map((version) => <div className="version-row" key={version.id}><strong>v{version.number}</strong><span>{version.status}</span><small>{version.createdAt}</small><button className="link-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}
+              {(versions[selectedId] ?? []).slice(0, 4).map((version) => <div className="version-row" key={version.id}><strong>v{version.number}</strong><span>{version.status}{version.note ? " · " + version.note : ""}</span><small>{version.createdAt}</small><button className="link-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}
               {!(versions[selectedId] ?? []).length && <p className="empty-state">No saved versions yet.</p>}
             </section>
           </aside>
@@ -770,6 +821,7 @@ export default function StudioPage() {
           <div className="preview-copy"><p className="eyebrow">LIVE PREVIEW</p><h2>Test real screen states</h2><p>Use the same document with representative API responses and failure states before it reaches Android or iOS.</p><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
           <MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} />
         </section>
+        {pendingRestore && <div className="dialog-backdrop"><section className="confirm-dialog"><h2>Restore version v{pendingRestore.number}?</h2><p>This replaces the document currently in the editor. It will remain a draft until you save and publish again.</p><div><button className="secondary" onClick={() => setPendingRestore(null)}>Cancel</button><button className="primary" onClick={confirmRestoreVersion}>Restore into draft</button></div></section></div>}
       </section>
     </main>
   );
