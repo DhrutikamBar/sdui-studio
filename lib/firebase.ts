@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
+import { getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const config = {
@@ -28,13 +28,20 @@ export function observeStudioUser(callback: (user: User | null) => void) {
   return firebaseApp ? onAuthStateChanged(getAuth(firebaseApp), callback) : () => undefined;
 }
 
-export async function signInToStudio() {
+export async function signInToStudio(email: string, password: string) {
   const firebaseApp = app();
   if (!firebaseApp) throw new Error("Firebase is not configured for this deployment.");
-  await signInWithPopup(getAuth(firebaseApp), new GoogleAuthProvider());
+  await signInWithEmailAndPassword(getAuth(firebaseApp), email, password);
+}
+
+export async function resetStudioPassword(email: string) {
+  const firebaseApp = app();
+  if (!firebaseApp) throw new Error("Firebase is not configured for this deployment.");
+  await sendPasswordResetEmail(getAuth(firebaseApp), email);
 }
 
 export async function signOutOfStudio() {
   const firebaseApp = app();
   if (firebaseApp) await signOut(getAuth(firebaseApp));
 }
+
