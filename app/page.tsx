@@ -190,6 +190,14 @@ const componentTemplates: Record<string, JsonObject> = {
   row: { type: "row", props: { style: { padding: "sm", arrangement: "spaceBetween" } }, children: [{ type: "text", props: { value: "Left label" } }, { type: "text", props: { value: "Right value" } }] },
   card: { type: "box", props: { style: { padding: "md", background: "#FFFFFF", cornerRadius: 16 } }, children: [{ type: "text", props: { value: "Card title", style: { color: "#142039", fontWeight: "bold" } } }] },
   spacer: { type: "spacer", props: { height: 16 } },
+  image: { type: "image", props: { src: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=600&q=80", contentDescription: "" } },
+  icon: { type: "icon", props: { name: "star" } },
+  textInput: { type: "textInput", props: { label: "Label", placeholder: "Enter a value" } },
+  switch: { type: "switch", props: { label: "Enable notifications", checked: false } },
+  chip: { type: "chip", props: { label: "New" } },
+  divider: { type: "divider", props: {} },
+  tabs: { type: "tabs", props: { items: ["Overview", "Activity", "Settings"], selectedIndex: 0 } },
+  bottomNavigation: { type: "bottomNavigation", props: { items: ["Home", "Wallet", "Profile"], selectedIndex: 0 } },
 };
 
 function getValue(path: string, source: Record<string, unknown>): unknown {
@@ -211,15 +219,18 @@ function resolveText(value: unknown, scope: Record<string, unknown>): string {
 
 function styleFor(node: JsonObject, scope: Record<string, unknown>): CSSProperties {
   const style = (node.props?.style ?? {}) as Record<string, unknown>;
-  const padding = style.padding === "md" ? 16 : style.padding === "sm" ? 8 : style.padding === "lg" ? 24 : 0;
+  const spacing = (value: unknown) => value === "xs" ? 4 : value === "sm" ? 8 : value === "md" ? 16 : value === "lg" ? 24 : value === "xl" ? 32 : typeof value === "number" ? value : 0;
   return {
-    padding,
+    padding: spacing(style.padding),
+    gap: spacing(style.gap) || undefined,
     background: resolveText(style.background, scope) || undefined,
     color: resolveText(style.color, scope) || undefined,
     fontSize: typeof style.fontSize === "number" ? style.fontSize : undefined,
     fontWeight: style.fontWeight === "bold" ? 700 : style.fontWeight === "medium" ? 600 : undefined,
+    textAlign: style.textAlign === "center" || style.textAlign === "end" ? style.textAlign : undefined,
     borderRadius: typeof style.cornerRadius === "number" ? style.cornerRadius : undefined,
-    width: style.width === "fill" ? "100%" : undefined
+    width: style.width === "fill" ? "100%" : undefined,
+    minHeight: typeof style.height === "number" ? style.height : undefined,
   };
 }
 
@@ -227,6 +238,7 @@ function MobilePreview({ document }: { document: JsonObject | null }) {
   function renderNode(node: JsonObject, scope: Record<string, unknown>, key: string): ReactNode {
     const props = node.props ?? {};
     const children = node.children ?? [];
+    if (props.visible === false) return null;
     if (node.type === "repeater") {
       const rawItems = props.items;
       const path = typeof rawItems === "string" ? rawItems.replace(/[{}\s]/g, "") : "";
@@ -245,6 +257,33 @@ function MobilePreview({ document }: { document: JsonObject | null }) {
 
     if (node.type === "button") {
       return <button key={key} className="preview-button">{resolveText(props.label, scope)}</button>;
+    }
+
+    if (node.type === "image") {
+      return <img key={key} className="preview-image" src={resolveText(props.src, scope)} alt={resolveText(props.contentDescription, scope)} />;
+    }
+
+    if (node.type === "icon") {
+      return <span key={key} className="preview-icon" aria-label={resolveText(props.contentDescription, scope)}>{resolveText(props.name, scope) || "●"}</span>;
+    }
+
+    if (node.type === "textInput") {
+      return <label key={key} className="preview-input"><span>{resolveText(props.label, scope)}</span><input placeholder={resolveText(props.placeholder, scope)} disabled /></label>;
+    }
+
+    if (node.type === "switch") {
+      return <label key={key} className="preview-switch"><span>{resolveText(props.label, scope)}</span><input type="checkbox" checked={props.checked === true} readOnly /></label>;
+    }
+
+    if (node.type === "chip") {
+      return <span key={key} className="preview-chip">{resolveText(props.label, scope)}</span>;
+    }
+
+    if (node.type === "divider") return <hr key={key} className="preview-divider" />;
+
+    if (node.type === "tabs" || node.type === "bottomNavigation") {
+      const items = Array.isArray(props.items) ? props.items : [];
+      return <div key={key} className={node.type === "tabs" ? "preview-tabs" : "preview-bottom-nav"}>{items.map((item, index) => <span className={props.selectedIndex === index ? "selected" : ""} key={index}>{String(item)}</span>)}</div>;
     }
 
     if (node.type === "spacer") {
@@ -435,6 +474,16 @@ export default function StudioPage() {
     setJson(JSON.stringify(document, null, 2));
   }
 
+  function setSelectedProp(key: string, value: unknown) {
+    updateSelectedNode((node) => { node.props = { ...node.props, [key]: value }; });
+  }
+
+  function setSelectedStyle(key: string, value: unknown) {
+    updateSelectedNode((node) => {
+      node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), [key]: value } };
+    });
+  }
+
   function deleteSelectedNode() {
     if (!selectedPath.length || !parsed.document) return;
     const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
@@ -611,15 +660,25 @@ export default function StudioPage() {
               <div className="panel-heading compact"><div><h2>Component properties</h2><p>Editing <code>{selectedNode.type}</code></p></div>{selectedPath.length > 0 && <button className="danger-link" onClick={deleteSelectedNode}>Remove</button>}</div>
               {selectedPath.length > 0 && <div className="layout-actions"><button onClick={() => moveSelectedBy(-1)}>↑ Move up</button><button onClick={() => moveSelectedBy(1)}>↓ Move down</button><button onClick={duplicateSelectedNode}>Duplicate</button><button onClick={moveSelectedIntoTarget} disabled={!nestingTargetPath}>Move into target</button></div>}
               {isContainer(selectedNode) && <button className="nest-button" onClick={setNestingTarget}>Use {selectedNode.type} as nesting target</button>}
-              {selectedNode.type === "text" && <label>Text value<input value={typeof selectedProps.value === "string" ? selectedProps.value : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, value: event.target.value }; })} /></label>}
+              {selectedNode.type === "text" && <>
+                <label>Text value<input value={typeof selectedProps.value === "string" ? selectedProps.value : ""} onChange={(event) => setSelectedProp("value", event.target.value)} /></label>
+                <label>Font size<input type="number" min="8" max="72" value={typeof selectedStyle.fontSize === "number" ? selectedStyle.fontSize : ""} onChange={(event) => setSelectedStyle("fontSize", Number(event.target.value) || 16)} /></label>
+                <label>Font weight<select value={typeof selectedStyle.fontWeight === "string" ? selectedStyle.fontWeight : ""} onChange={(event) => setSelectedStyle("fontWeight", event.target.value)}><option value="">Regular</option><option value="medium">Medium</option><option value="bold">Bold</option></select></label>
+                <label>Text alignment<select value={typeof selectedStyle.textAlign === "string" ? selectedStyle.textAlign : ""} onChange={(event) => setSelectedStyle("textAlign", event.target.value)}><option value="">Start</option><option value="center">Center</option><option value="end">End</option></select></label>
+              </>}
               {selectedNode.type === "button" && <>
-                <label>Button label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, label: event.target.value }; })} /></label>
+                <label>Button label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => setSelectedProp("label", event.target.value)} /></label>
                 <label>Action type<select value={typeof selectedNode.action?.type === "string" ? selectedNode.action.type : "navigate"} onChange={(event) => updateSelectedNode((node) => { node.action = { ...node.action, type: event.target.value }; })}><option value="navigate">Navigate</option><option value="analytics">Analytics</option><option value="refreshData">Refresh data</option></select></label>
                 <label>Action target<input value={typeof selectedNode.action?.target === "string" ? selectedNode.action.target : ""} onChange={(event) => updateSelectedNode((node) => { node.action = { ...node.action, target: event.target.value }; })} /></label>
               </>}
-              <label>Background color<input value={typeof selectedStyle.background === "string" ? selectedStyle.background : ""} placeholder="#FFFFFF" onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), background: event.target.value } }; })} /></label>
-              <label>Text color<input value={typeof selectedStyle.color === "string" ? selectedStyle.color : ""} placeholder="#142039" onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), color: event.target.value } }; })} /></label>
-              <label>Padding<select value={typeof selectedStyle.padding === "string" ? selectedStyle.padding : ""} onChange={(event) => updateSelectedNode((node) => { node.props = { ...node.props, style: { ...((node.props?.style ?? {}) as Record<string, unknown>), padding: event.target.value } }; })}><option value="">None</option><option value="xs">Extra small</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">Extra large</option></select></label>
+              {selectedNode.type === "image" && <><label>Image URL<input value={typeof selectedProps.src === "string" ? selectedProps.src : ""} onChange={(event) => setSelectedProp("src", event.target.value)} /></label><label>Accessibility description<input value={typeof selectedProps.contentDescription === "string" ? selectedProps.contentDescription : ""} onChange={(event) => setSelectedProp("contentDescription", event.target.value)} /></label></>}
+              {selectedNode.type === "icon" && <><label>Icon name<input value={typeof selectedProps.name === "string" ? selectedProps.name : ""} onChange={(event) => setSelectedProp("name", event.target.value)} /></label><label>Accessibility description<input value={typeof selectedProps.contentDescription === "string" ? selectedProps.contentDescription : ""} onChange={(event) => setSelectedProp("contentDescription", event.target.value)} /></label></>}
+              {(selectedNode.type === "textInput" || selectedNode.type === "switch" || selectedNode.type === "chip") && <label>Label<input value={typeof selectedProps.label === "string" ? selectedProps.label : ""} onChange={(event) => setSelectedProp("label", event.target.value)} /></label>}
+              {selectedNode.type === "textInput" && <label>Placeholder<input value={typeof selectedProps.placeholder === "string" ? selectedProps.placeholder : ""} onChange={(event) => setSelectedProp("placeholder", event.target.value)} /></label>}
+              {selectedNode.type === "switch" && <label className="check-label"><input type="checkbox" checked={selectedProps.checked === true} onChange={(event) => setSelectedProp("checked", event.target.checked)} /> Default value on</label>}
+              {(selectedNode.type === "tabs" || selectedNode.type === "bottomNavigation") && <><label>Items (comma-separated)<input value={Array.isArray(selectedProps.items) ? selectedProps.items.join(", ") : ""} onChange={(event) => setSelectedProp("items", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Selected item<input type="number" min="0" value={typeof selectedProps.selectedIndex === "number" ? selectedProps.selectedIndex : 0} onChange={(event) => setSelectedProp("selectedIndex", Number(event.target.value) || 0)} /></label></>}
+              {isContainer(selectedNode) && <label>Arrangement<select value={typeof selectedStyle.arrangement === "string" ? selectedStyle.arrangement : ""} onChange={(event) => setSelectedStyle("arrangement", event.target.value)}><option value="">Start</option><option value="spaceBetween">Space between</option><option value="center">Center</option><option value="end">End</option></select></label>}
+              <fieldset className="property-group"><legend>Layout and style</legend><label>Background color<input value={typeof selectedStyle.background === "string" ? selectedStyle.background : ""} placeholder="#FFFFFF" onChange={(event) => setSelectedStyle("background", event.target.value)} /></label><label>Text color<input value={typeof selectedStyle.color === "string" ? selectedStyle.color : ""} placeholder="#142039" onChange={(event) => setSelectedStyle("color", event.target.value)} /></label><label>Padding<select value={typeof selectedStyle.padding === "string" ? selectedStyle.padding : ""} onChange={(event) => setSelectedStyle("padding", event.target.value)}><option value="">None</option><option value="xs">Extra small</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">Extra large</option></select></label><label>Gap<select value={typeof selectedStyle.gap === "string" ? selectedStyle.gap : ""} onChange={(event) => setSelectedStyle("gap", event.target.value)}><option value="">None</option><option value="xs">Extra small</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">Extra large</option></select></label><label>Corner radius<input type="number" min="0" value={typeof selectedStyle.cornerRadius === "number" ? selectedStyle.cornerRadius : ""} onChange={(event) => setSelectedStyle("cornerRadius", Number(event.target.value) || 0)} /></label><label>Width<select value={typeof selectedStyle.width === "string" ? selectedStyle.width : ""} onChange={(event) => setSelectedStyle("width", event.target.value)}><option value="">Wrap content</option><option value="fill">Fill available width</option></select></label><label className="check-label"><input type="checkbox" checked={selectedProps.visible !== false} onChange={(event) => setSelectedProp("visible", event.target.checked)} /> Visible</label></fieldset>
             </section>}
 
             <section className="card">
