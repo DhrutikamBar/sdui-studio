@@ -95,3 +95,17 @@ npm run dev
 
 Then open the localhost link shown in the terminal.
 
+
+
+## Client projects (multi-tenant workspaces)
+
+Studio supports multiple client projects without deploying a separate copy of Studio for each client. A project has its own display name, Android/iOS package identifier, member list, screen catalog, drafts, and published document versions.
+
+- **Demo workspace** remains the legacy/default project, so existing screens continue to work unchanged.
+- An **admin** creates a project from the left-side project switcher and becomes its first member.
+- Project screens are stored under project-scoped Firestore IDs; routes such as `home` and `wallet` can therefore exist independently for different clients.
+- Firestore rules permit only project members to read a project, and only designer/admin members to write it.
+
+Before enabling this in Firebase, deploy the current `firestore.rules`. Existing administrators can then create a client project. Add other users' Firebase Authentication UIDs to its `memberIds` field in Firestore until the member-management screen adds project membership controls.
+
+The mobile host must select the client project when it requests a remote screen (for example `projectId: "acme-banking-…"`). The current demo app deliberately continues to load the legacy project until that host integration is enabled.
