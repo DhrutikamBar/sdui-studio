@@ -82,7 +82,9 @@ Deploy `firestore.rules` from the Firebase Console or Firebase CLI before enabli
 5. Deploy `firestore.rules` and refresh Studio.
 6. The administrator signs in through Studio, then can save a draft and verify the top-bar status reads **Shared workspace is in sync**.
 
-Studio intentionally has no public sign-up form. New user accounts must be created from Firebase Console now; a future trusted admin backend can add user management inside Studio without exposing Firebase administration credentials to browsers.
+Studio intentionally has no public sign-up form. An administrator first creates each authentication account in Firebase Console, then uses **People and activity** in Studio to add that account UID, email address, role, and active status. Studio never stores or receives another user’s password.
+
+The same panel provides a password-reset request and an immutable activity feed. Deactivating a member immediately removes Studio permissions through Firestore rules (it does not delete the Firebase Authentication account).
 
 ## Run the Studio locally
 
