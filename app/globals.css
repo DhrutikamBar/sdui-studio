@@ -617,3 +617,28 @@ body { background: radial-gradient(circle at 88% -5%, #e4e3ff 0, transparent 30r
   .workspace-view-tabs button { padding: 7px 3px; }
   .workspace-view-tabs button > span { display: none; }
 }
+
+
+/* Client project selector and creation flow */
+.workspace-switcher select { width: 100%; margin-top: 6px; padding: 9px 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 9px; color: #fff; background: rgba(255,255,255,.1); font: inherit; font-size: 12px; font-weight: 700; outline: none; }
+.workspace-switcher select option { color: #1e2638; background: #fff; }
+.workspace-switcher small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-create-button { width: calc(100% - 8px); margin: 0 4px 11px; padding: 9px 10px; border: 1px dashed rgba(255,255,255,.3); border-radius: 10px; color: #e9e8ff; background: rgba(255,255,255,.06); font-size: 11px; font-weight: 750; text-align: left; transition: border-color .18s ease, background .18s ease; }
+.project-create-button:hover { border-color: #aaa5ff; background: rgba(123,116,255,.22); }
+.project-dialog-backdrop { z-index: 55; }
+.project-dialog { position: relative; width: min(480px, 100%); padding: 28px; border: 1px solid #e2e5f0; border-radius: 18px; color: #1c2436; background: #fff; box-shadow: 0 28px 80px rgba(10, 18, 45, .32); }
+.project-dialog h2 { margin: 6px 0 8px; font-size: 25px; letter-spacing: -.04em; }
+.project-dialog > p:not(.eyebrow) { margin: 0 0 20px; color: #697386; font-size: 13px; line-height: 1.55; }
+.project-dialog label { display: grid; gap: 6px; margin-top: 13px; color: #3e475a; font-size: 12px; font-weight: 750; }
+.project-dialog input { width: 100%; padding: 11px 12px; border: 1px solid #dce1eb; border-radius: 9px; color: #1d2638; background: #fbfcff; font: inherit; font-size: 13px; outline-color: #736bff; }
+.project-dialog .dialog-close { position: absolute; top: 14px; right: 14px; width: 31px; height: 31px; padding: 0; border: 1px solid #e1e5ed; border-radius: 8px; color: #606a7d; background: #fff; font-size: 21px; line-height: 1; }
+.project-error { margin-top: 13px; padding: 9px 10px; border-radius: 8px; color: #b42318; background: #fff0ef; font-size: 12px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
+@media (max-width: 860px) {
+  .project-create-button { display: block; }
+}
+@media (max-width: 620px) {
+  .project-dialog { width: 100%; padding: 23px 18px; border-radius: 17px 17px 0 0; }
+  .project-dialog-backdrop { align-items: end; padding: 0; }
+  .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; }
+}
