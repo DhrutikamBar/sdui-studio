@@ -429,6 +429,7 @@ export default function StudioPage() {
   const [bindingTarget, setBindingTarget] = useState("value");
   const [bindingFilter, setBindingFilter] = useState("");
   const [previewState, setPreviewState] = useState("content");
+  const [showFloatingPreview, setShowFloatingPreview] = useState(false);
   const [sampleScenario, setSampleScenario] = useState("standard");
   const [showArchived, setShowArchived] = useState(false);
   const [screenSearch, setScreenSearch] = useState("");
@@ -1084,10 +1085,19 @@ export default function StudioPage() {
 
         <StudioGovernancePanel actor={firebaseUser} />
 
-        <section className="preview-section">
-          <div className="preview-copy"><p className="eyebrow">LIVE PREVIEW</p><h2>Test real screen states</h2><p>Use the same document with representative API responses and failure states before it reaches Android or iOS.</p><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
-          <MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} />
+        <section className="preview-launcher">
+          <div><p className="eyebrow">LIVE PREVIEW</p><h2>Open the mobile demo in a floating window</h2><p>Resize the preview while testing the same screen with representative API data and failure states.</p></div>
+          <button className="primary preview-launch-button" onClick={() => setShowFloatingPreview(true)}>Open mobile preview</button>
         </section>
+        {showFloatingPreview && <div className="floating-preview-backdrop" role="presentation">
+          <section className="floating-preview-dialog" role="dialog" aria-modal="true" aria-label="Mobile screen preview">
+            <header className="floating-preview-header"><div><p className="eyebrow">LIVE PREVIEW</p><strong>{title}</strong><small>Drag the lower-right corner to resize on desktop.</small></div><button className="logout-button" onClick={() => setShowFloatingPreview(false)} aria-label="Close mobile preview">Close</button></header>
+            <div className="floating-preview-body">
+              <div className="floating-preview-controls"><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
+              <div className="floating-phone-wrap"><MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} /></div>
+            </div>
+          </section>
+        </div>
         {pendingRestore && <div className="dialog-backdrop"><section className="confirm-dialog"><h2>Restore version v{pendingRestore.number}?</h2><p>This replaces the document currently in the editor. It will remain a draft until you save and publish again.</p><div><button className="secondary" onClick={() => setPendingRestore(null)}>Cancel</button><button className="primary" onClick={confirmRestoreVersion}>Restore into draft</button></div></section></div>}
       </section>
     </main>
