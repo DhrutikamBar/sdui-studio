@@ -450,7 +450,21 @@ export default function StudioPage() {
     if (!firebaseUser) return;
     return watchRemoteScreens((remote) => {
       if (!remote.length) return;
-      setScreens(remote.map((screen) => ({ ...screen, updatedAt: new Date(screen.updatedAt).toLocaleString() })));
+      // Firestore may initially contain only the screen that was just saved.
+      // Merge that metadata into the local/bundled catalog rather than replacing it,
+      // so a partial remote collection can never make other screens disappear.
+      setScreens((current) => {
+        const remoteById = new Map(remote.map((screen) => [
+          screen.id,
+          { ...screen, updatedAt: new Date(screen.updatedAt).toLocaleString() }
+        ]));
+        const merged = current.map((screen) => ({ ...screen, ...(remoteById.get(screen.id) ?? {}) }));
+        const knownIds = new Set(merged.map((screen) => screen.id));
+        remoteById.forEach((screen, id) => {
+          if (!knownIds.has(id)) merged.push(screen);
+        });
+        return merged;
+      });
       setSyncState("saved");
       setSyncDetail("Shared workspace is in sync");
     }, (message) => {
