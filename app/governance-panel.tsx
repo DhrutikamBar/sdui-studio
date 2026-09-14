@@ -61,6 +61,7 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
   }, [actor, profile?.role]);
 
   if (!actor) return null;
+  const currentActor = actor;
 
   const isAdmin = profile?.role === "admin";
   const canManage = isAdmin && profile?.active !== false;
@@ -79,8 +80,8 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
         role,
         active,
       }, {
-        uid: actor.uid,
-        label: actor.displayName ?? actor.email ?? actor.uid,
+        uid: currentActor.uid,
+        label: currentActor.displayName ?? currentActor.email ?? currentActor.uid,
       });
       setNotice("Studio access record saved. The account can now use the selected role.");
       setUid("");
@@ -97,8 +98,8 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
     if (!canManage) return;
     try {
       await saveStudioMember({ ...member, ...changes }, {
-        uid: actor.uid,
-        label: actor.displayName ?? actor.email ?? actor.uid,
+        uid: currentActor.uid,
+        label: currentActor.displayName ?? currentActor.email ?? currentActor.uid,
       });
       setNotice("Access updated for " + member.email + ".");
     } catch (reason) {
@@ -147,8 +148,8 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
           <div className="member-list">
             {members.map((member) => <div className="member-row" key={member.uid}>
               <div><strong>{member.displayName || member.email}</strong><small>{member.email}</small></div>
-              <select aria-label={"Role for " + member.email} value={member.role} disabled={member.uid === actor.uid} onChange={(event) => void updateMember(member, { role: event.target.value as StudioRole })}>{roles.map((value) => <option key={value}>{value}</option>)}</select>
-              <label className="member-active"><input type="checkbox" checked={member.active} disabled={member.uid === actor.uid} onChange={(event) => void updateMember(member, { active: event.target.checked })} /> Active</label>
+              <select aria-label={"Role for " + member.email} value={member.role} disabled={member.uid === currentActor.uid} onChange={(event) => void updateMember(member, { role: event.target.value as StudioRole })}>{roles.map((value) => <option key={value}>{value}</option>)}</select>
+              <label className="member-active"><input type="checkbox" checked={member.active} disabled={member.uid === currentActor.uid} onChange={(event) => void updateMember(member, { active: event.target.checked })} /> Active</label>
               <button className="link-button" type="button" onClick={() => void sendReset(member)}>Reset password</button>
             </div>)}
             {!members.length && <p className="empty-state">No access records are visible yet.</p>}
