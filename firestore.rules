@@ -6,26 +6,53 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function member() {
+      return get(/databases/$(database)/documents/studioUsers/$(request.auth.uid)).data;
+    }
+
+    function activeMember() {
+      return member().get('active', true) == true;
+    }
+
     function role() {
-      return get(/databases/$(database)/documents/studioUsers/$(request.auth.uid)).data.role;
+      return member().get('role', 'reviewer');
     }
 
     function canReadStudio() {
-      return signedIn() && role() in ['designer', 'reviewer', 'admin'];
+      return signedIn() && activeMember() && role() in ['designer', 'reviewer', 'admin'];
     }
 
     function canEditStudio() {
-      return signedIn() && role() in ['designer', 'admin'];
+      return signedIn() && activeMember() && role() in ['designer', 'admin'];
     }
 
     function isAdmin() {
-      return signedIn() && role() == 'admin';
+      return signedIn() && activeMember() && role() == 'admin';
     }
 
-    // Role records are administered only from the Firebase Console or a trusted server.
+    function validRole() {
+      return request.resource.data.role in ['designer', 'reviewer', 'admin'];
+    }
+
+    // Accounts are created in Firebase Authentication by an administrator.
+    // Studio admins grant, change, or revoke Studio access through these records.
     match /studioUsers/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() && validRole();
+      allow update: if isAdmin() && validRole()
+        && (request.auth.uid != userId
+          || (request.resource.data.role == resource.data.role
+            && request.resource.data.get('active', true) == resource.data.get('active', true)));
+      allow delete: if false;
+    }
+
+    // Immutable audit history. The authenticated UID is written into every event.
+    match /studioAudit/{auditId} {
+      allow read: if canReadStudio();
+      allow create: if canEditStudio()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.createdAt is int;
+      allow update, delete: if false;
     }
 
     match /sduiScreens/{screenId} {
@@ -43,4 +70,3 @@ service cloud.firestore {
     }
   }
 }
-
