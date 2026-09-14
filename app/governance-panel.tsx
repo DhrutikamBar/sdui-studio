@@ -1,0 +1,172 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { resetStudioPassword } from "../lib/firebase";
+import {
+  loadStudioMember,
+  observeStudioAudit,
+  observeStudioMembers,
+  saveStudioMember,
+  type StudioAuditEntry,
+  type StudioMember,
+  type StudioRole,
+} from "../lib/studio-governance";
+
+type StudioActor = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+};
+
+const roles: StudioRole[] = ["designer", "reviewer", "admin"];
+
+export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) {
+  const [profile, setProfile] = useState<StudioMember | null>(null);
+  const [members, setMembers] = useState<StudioMember[]>([]);
+  const [audit, setAudit] = useState<StudioAuditEntry[]>([]);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [uid, setUid] = useState("");
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState<StudioRole>("designer");
+  const [active, setActive] = useState(true);
+
+  useEffect(() => {
+    if (!actor) {
+      setProfile(null);
+      setMembers([]);
+      setAudit([]);
+      return;
+    }
+    let cancelled = false;
+    void loadStudioMember(actor.uid).then((member) => {
+      if (!cancelled) setProfile(member);
+    }).catch((reason) => {
+      if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load your Studio role.");
+    });
+    const stopAudit = observeStudioAudit(setAudit, (message) => setError(message));
+    return () => {
+      cancelled = true;
+      stopAudit();
+    };
+  }, [actor]);
+
+  useEffect(() => {
+    if (!actor || profile?.role !== "admin") {
+      setMembers([]);
+      return;
+    }
+    return observeStudioMembers(setMembers, (message) => setError(message));
+  }, [actor, profile?.role]);
+
+  if (!actor) return null;
+
+  const isAdmin = profile?.role === "admin";
+  const canManage = isAdmin && profile?.active !== false;
+
+  async function saveAccessRecord() {
+    if (!canManage) return;
+    if (!uid.trim() || !email.trim()) {
+      setNotice("Enter the Firebase Authentication UID and email address first.");
+      return;
+    }
+    try {
+      await saveStudioMember({
+        uid: uid.trim(),
+        email: email.trim().toLowerCase(),
+        displayName: displayName.trim(),
+        role,
+        active,
+      }, {
+        uid: actor.uid,
+        label: actor.displayName ?? actor.email ?? actor.uid,
+      });
+      setNotice("Studio access record saved. The account can now use the selected role.");
+      setUid("");
+      setEmail("");
+      setDisplayName("");
+      setRole("designer");
+      setActive(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not save the access record.");
+    }
+  }
+
+  async function updateMember(member: StudioMember, changes: Partial<Pick<StudioMember, "role" | "active">>) {
+    if (!canManage) return;
+    try {
+      await saveStudioMember({ ...member, ...changes }, {
+        uid: actor.uid,
+        label: actor.displayName ?? actor.email ?? actor.uid,
+      });
+      setNotice("Access updated for " + member.email + ".");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not update access.");
+    }
+  }
+
+  async function sendReset(member: StudioMember) {
+    try {
+      await resetStudioPassword(member.email);
+      setNotice("Password reset email requested for " + member.email + ".");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not request the password reset.");
+    }
+  }
+
+  return (
+    <section className="governance-section">
+      <div className="governance-heading">
+        <div>
+          <p className="eyebrow">WORKSPACE GOVERNANCE</p>
+          <h2>People and activity</h2>
+          <p>Roles control Studio access. Every saved draft and published version is recorded below.</p>
+        </div>
+        <span className={"role-pill " + (profile?.role ?? "unknown")}>{profile?.role ?? "role pending"}</span>
+      </div>
+      {error && <p className="governance-error">{error}</p>}
+      {notice && <p className="governance-notice">{notice}</p>}
+      {!profile && !error && <p className="empty-state">Loading your Studio access record…</p>}
+
+      {canManage && <div className="access-grid">
+        <section className="governance-card">
+          <h3>Add or update Studio access</h3>
+          <p>Create the Firebase Authentication account in Firebase Console first, then paste its UID here. Passwords never enter Studio.</p>
+          <div className="governance-form">
+            <label>Authentication UID<input value={uid} onChange={(event) => setUid(event.target.value)} placeholder="Firebase user UID" /></label>
+            <label>Work email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" /></label>
+            <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Optional" /></label>
+            <label>Role<select value={role} onChange={(event) => setRole(event.target.value as StudioRole)}>{roles.map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label className="check-label"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /> Account can access Studio</label>
+            <button className="primary" type="button" onClick={saveAccessRecord}>Save access</button>
+          </div>
+        </section>
+        <section className="governance-card">
+          <h3>Studio members</h3>
+          <div className="member-list">
+            {members.map((member) => <div className="member-row" key={member.uid}>
+              <div><strong>{member.displayName || member.email}</strong><small>{member.email}</small></div>
+              <select aria-label={"Role for " + member.email} value={member.role} disabled={member.uid === actor.uid} onChange={(event) => void updateMember(member, { role: event.target.value as StudioRole })}>{roles.map((value) => <option key={value}>{value}</option>)}</select>
+              <label className="member-active"><input type="checkbox" checked={member.active} disabled={member.uid === actor.uid} onChange={(event) => void updateMember(member, { active: event.target.checked })} /> Active</label>
+              <button className="link-button" type="button" onClick={() => void sendReset(member)}>Reset password</button>
+            </div>)}
+            {!members.length && <p className="empty-state">No access records are visible yet.</p>}
+          </div>
+        </section>
+      </div>}
+
+      <section className="governance-card audit-card">
+        <h3>Recent activity</h3>
+        <div className="audit-list">
+          {audit.map((entry) => <div className="audit-row" key={entry.id}>
+            <span className={"audit-dot " + entry.action} />
+            <div><strong>{entry.action.replaceAll("_", " ")}</strong><small>{entry.targetLabel || entry.screenId || "Studio workspace"} · {entry.actorLabel}</small></div>
+            <time>{new Date(entry.createdAt).toLocaleString()}</time>
+          </div>)}
+          {!audit.length && <p className="empty-state">Activity appears here after the next draft save, publish, restore, archive, or access change.</p>}
+        </div>
+      </section>
+    </section>
+  );
+}
