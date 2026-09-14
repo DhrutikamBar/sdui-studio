@@ -302,7 +302,13 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
       const isRow = node.type === "lazyRow";
       const isGrid = node.type === "lazyGrid" || node.type === "grid";
       const columns = typeof props.columns === "number" ? Math.max(1, Math.floor(props.columns)) : 2;
-      return <div key={key} style={{ display: isGrid ? "grid" : "flex", gridTemplateColumns: isGrid ? `repeat(${columns}, minmax(0, 1fr))` : undefined, flexDirection: isRow ? "row" : "column", overflowX: isRow ? "auto" : undefined, overflowY: !isRow ? "auto" : undefined, maxHeight: typeof props.height === "number" ? props.height : isRow ? undefined : 260, gap: 8, ...styleFor(node, scope) }}>{children.map((child, index) => <div key={index} style={isRow ? { flex: `0 0 ${typeof props.itemWidth === "number" ? props.itemWidth : 180}px` } : undefined}>{renderNode(child, scope, key + "-" + index)}</div>)}</div>;
+      const rawItems = props.items;
+      const path = typeof rawItems === "string" ? rawItems.replace(/[{}\\s]/g, "") : "";
+      const boundItems = getValue(path, scope);
+      const renderedItems = Array.isArray(boundItems)
+        ? boundItems.flatMap((item, index) => children.map((child, childIndex) => ({ child, scope: { ...scope, item, index }, key: key + "-" + index + "-" + childIndex })))
+        : children.map((child, index) => ({ child, scope, key: key + "-" + index }));
+      return <div key={key} style={{ display: isGrid ? "grid" : "flex", gridTemplateColumns: isGrid ? `repeat(${columns}, minmax(0, 1fr))` : undefined, flexDirection: isRow ? "row" : "column", overflowX: isRow ? "auto" : undefined, overflowY: !isRow ? "auto" : undefined, maxHeight: typeof props.height === "number" ? props.height : isRow ? undefined : 260, gap: 8, ...styleFor(node, scope) }}>{renderedItems.map((item) => <div key={item.key} style={isRow ? { flex: `0 0 ${typeof props.itemWidth === "number" ? props.itemWidth : 180}px` } : undefined}>{renderNode(item.child, item.scope, item.key)}</div>)}</div>;
     }
 
     if (node.type === "text") {
