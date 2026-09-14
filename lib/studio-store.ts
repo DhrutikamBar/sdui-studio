@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
 import { firestore } from "./firebase";
+import { writeStudioAudit } from "./studio-governance";
 
 export type RemoteScreen = {
   id: string;
@@ -62,6 +63,10 @@ export async function saveRemoteVersion(input: SaveRemoteVersionInput, actor: St
     ...version,
     createdAt,
     createdBy: actor.label,
+  });
+  await writeStudioAudit(input.status === "Published" ? "screen_published" : "draft_saved", actor, {
+    screenId: input.screenId,
+    targetLabel: input.title,
   });
 }
 
