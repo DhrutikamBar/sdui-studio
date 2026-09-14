@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./auth-shell.css";
 
 export const metadata: Metadata = {
   title: "SDUI Studio",
@@ -14,3 +15,4 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     </html>
   );
 }
+
