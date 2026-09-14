@@ -430,6 +430,7 @@ export default function StudioPage() {
   const [bindingFilter, setBindingFilter] = useState("");
   const [previewState, setPreviewState] = useState("content");
   const [showFloatingPreview, setShowFloatingPreview] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sampleScenario, setSampleScenario] = useState("standard");
   const [showArchived, setShowArchived] = useState(false);
   const [screenSearch, setScreenSearch] = useState("");
@@ -955,7 +956,8 @@ export default function StudioPage() {
 
   return (
     <main className="studio-shell">
-      <aside className="sidebar">
+      <aside className={"sidebar " + (mobileMenuOpen ? "mobile-open" : "")}>
+        <button className="mobile-drawer-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close screen library">×</button>
         <div className="sidebar-brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
         <div className="workspace-switcher"><span>WORKSPACE</span><strong>Mobile experience</strong><small>Firestore connected</small></div>
         <button className="new-screen" onClick={createScreen}><b>＋</b> New screen <kbd>N</kbd></button>
@@ -964,7 +966,7 @@ export default function StudioPage() {
         <label className="screen-search"><span>⌕</span><input value={screenSearch} onChange={(event) => setScreenSearch(event.target.value)} placeholder="Find a screen" /></label>
         <nav aria-label="Screen library">
           {visibleScreens.map((screen) => (
-            <button key={screen.id} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => chooseScreen(screen)}>
+            <button key={screen.id} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => { void chooseScreen(screen); setMobileMenuOpen(false); }}>
               <span><b>{screen.title.slice(0, 1).toUpperCase()}</b>{screen.title}</span><em className={screen.status === "Published" ? "published" : screen.status === "Archived" ? "archived" : "draft"}>{screen.status}</em>
             </button>
           ))}
@@ -973,10 +975,11 @@ export default function StudioPage() {
         <div className="sidebar-tools"><p className="sidebar-label">WORKSPACE TOOLS</p><div><span>◈</span><small>Versioned publishing</small></div><div><span>⌁</span><small>Data binding ready</small></div><div><span>✓</span><small>{syncDetail}</small></div></div>
         <div className="sidebar-footer"><span className="avatar">{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div>
       </aside>
+      {mobileMenuOpen && <button className="mobile-drawer-backdrop" aria-label="Close screen library" onClick={() => setMobileMenuOpen(false)} />}
 
       <section className="workspace">
         <header className="app-topbar">
-          <div className="app-brand"><span>◆</span><strong>SDUI Studio</strong><em>Workspace</em></div>
+          <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>SDUI Studio</strong><em>Workspace</em></div>
           <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
         <header className="topbar">
