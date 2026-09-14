@@ -229,6 +229,16 @@ const componentTemplates: Record<string, JsonObject> = {
   divider: { type: "divider", props: {} },
   tabs: { type: "tabs", props: { items: ["Overview", "Activity", "Settings"], selectedIndex: 0 } },
   bottomNavigation: { type: "bottomNavigation", props: { items: ["Home", "Wallet", "Profile"], selectedIndex: 0 } },
+  lazyColumn: { type: "lazyColumn", props: { height: 260, style: { gap: "sm" } }, children: [{ type: "box", props: { style: { padding: "sm", background: "#FFFFFF", cornerRadius: 12 } }, children: [{ type: "text", props: { value: "Lazy list item" } }] }] },
+  lazyRow: { type: "lazyRow", props: { height: 156, itemWidth: 180, style: { gap: "sm" } }, children: [{ type: "box", props: { style: { padding: "sm", background: "#FFFFFF", cornerRadius: 12 } }, children: [{ type: "text", props: { value: "Horizontal item" } }] }] },
+  lazyGrid: { type: "lazyGrid", props: { columns: 2, height: 260, style: { gap: "sm" } }, children: [{ type: "box", props: { style: { padding: "sm", background: "#FFFFFF", cornerRadius: 12 } }, children: [{ type: "text", props: { value: "Grid item" } }] }] },
+  repeater: { type: "repeater", props: { items: "{{transactions}}", style: { gap: "sm" } }, children: [{ type: "row", props: { style: { width: "fill", arrangement: "spaceBetween", padding: "sm" } }, children: [{ type: "text", props: { value: "{{item.title}}" } }, { type: "text", props: { value: "{{item.amountDisplay}}" } }] }] },
+  flowRow: { type: "flowRow", props: { style: { gap: "sm" } }, children: [{ type: "chip", props: { label: "Filter" } }, { type: "chip", props: { label: "Popular" } }, { type: "chip", props: { label: "Nearby" } }] },
+  pager: { type: "pager", props: { height: 180 }, children: [{ type: "box", props: { style: { padding: "md", background: "#DDEBFF", cornerRadius: 16 } }, children: [{ type: "text", props: { value: "Page one" } }] }, { type: "box", props: { style: { padding: "md", background: "#E7F8EE", cornerRadius: 16 } }, children: [{ type: "text", props: { value: "Page two" } }] }] },
+  checkbox: { type: "checkbox", props: { label: "I agree to the terms", checked: false } },
+  badge: { type: "badge", props: { label: "New" } },
+  progressBar: { type: "progressBar", props: { progress: 0.65, label: "Profile complete" } },
+  rating: { type: "rating", props: { rating: 4 } },
 };
 
 const sampleScenarios: Record<string, { label: string; data: Record<string, unknown> }> = {
@@ -288,6 +298,13 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
       );
     }
 
+    if (node.type === "lazyColumn" || node.type === "lazyRow" || node.type === "lazyGrid" || node.type === "list" || node.type === "grid") {
+      const isRow = node.type === "lazyRow";
+      const isGrid = node.type === "lazyGrid" || node.type === "grid";
+      const columns = typeof props.columns === "number" ? Math.max(1, Math.floor(props.columns)) : 2;
+      return <div key={key} style={{ display: isGrid ? "grid" : "flex", gridTemplateColumns: isGrid ? `repeat(${columns}, minmax(0, 1fr))` : undefined, flexDirection: isRow ? "row" : "column", overflowX: isRow ? "auto" : undefined, overflowY: !isRow ? "auto" : undefined, maxHeight: typeof props.height === "number" ? props.height : isRow ? undefined : 260, gap: 8, ...styleFor(node, scope) }}>{children.map((child, index) => <div key={index} style={isRow ? { flex: `0 0 ${typeof props.itemWidth === "number" ? props.itemWidth : 180}px` } : undefined}>{renderNode(child, scope, key + "-" + index)}</div>)}</div>;
+    }
+
     if (node.type === "text") {
       return <p key={key} style={{ margin: "0 0 8px", ...styleFor(node, scope) }}>{resolveText(props.value, scope)}</p>;
     }
@@ -312,9 +329,17 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
       return <label key={key} className="preview-switch"><span>{resolveText(props.label, scope)}</span><input type="checkbox" checked={props.checked === true} readOnly /></label>;
     }
 
+    if (node.type === "checkbox") {
+      return <label key={key} className="preview-switch"><span>{resolveText(props.label, scope)}</span><input type="checkbox" checked={props.checked === true} readOnly /></label>;
+    }
+
     if (node.type === "chip") {
       return <span key={key} className="preview-chip">{resolveText(props.label, scope)}</span>;
     }
+
+    if (node.type === "badge") return <span key={key} className="preview-chip">{resolveText(props.label, scope) || "New"}</span>;
+    if (node.type === "progressBar") return <div key={key}><span>{resolveText(props.label, scope)}</span><progress value={typeof props.progress === "number" ? props.progress : undefined} max="1" style={{ width: "100%" }} /></div>;
+    if (node.type === "rating") return <span key={key} aria-label={`${String(props.rating ?? 0)} out of 5 stars`}>{"★".repeat(Math.max(0, Math.min(5, Number(props.rating) || 0)))}{"☆".repeat(Math.max(0, 5 - Math.min(5, Number(props.rating) || 0)))}</span>;
 
     if (node.type === "divider") return <hr key={key} className="preview-divider" />;
 
@@ -325,6 +350,13 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
 
     if (node.type === "spacer") {
       return <div key={key} style={{ height: 12 }} />;
+    }
+
+    if (node.type === "flowRow") {
+      return <div key={key} style={{ display: "flex", flexWrap: "wrap", gap: 8, ...styleFor(node, scope) }}>{children.map((child, index) => renderNode(child, scope, key + "-" + index))}</div>;
+    }
+    if (node.type === "pager") {
+      return <div key={key} style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", gap: 10, ...styleFor(node, scope) }}>{children.map((child, index) => <div key={index} style={{ flex: "0 0 100%", scrollSnapAlign: "start" }}>{renderNode(child, scope, key + "-" + index)}</div>)}</div>;
     }
 
     const isRow = node.type === "row";
