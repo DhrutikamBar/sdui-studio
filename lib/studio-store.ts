@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, where } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { writeStudioAudit } from "./studio-governance";
 
@@ -10,6 +10,7 @@ export type RemoteScreen = {
   version: number;
   updatedAt: number;
   updatedBy?: string;
+  projectId?: string;
 };
 
 export type RemoteVersion = {
@@ -21,20 +22,48 @@ export type RemoteVersion = {
   document: string;
   createdAt: number;
   createdBy?: string;
+  projectId?: string;
 };
 
-export function watchRemoteScreens(callback: (screens: RemoteScreen[]) => void, onError: (message: string) => void) {
+function screenStorageId(screenId: string, projectId?: string) {
+  return projectId && projectId !== "legacy" ? projectId + "--" + screenId : screenId;
+}
+
+function remoteScreen(item: { id: string; data: () => Record<string, unknown> }): RemoteScreen {
+  const data = item.data();
+  return {
+    id: typeof data.screenId === "string" ? data.screenId : item.id,
+    route: typeof data.route === "string" ? data.route : item.id,
+    title: typeof data.title === "string" ? data.title : item.id,
+    status: data.status === "Published" ? "Published" : "Draft",
+    version: typeof data.version === "number" ? data.version : 1,
+    updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
+    updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : undefined,
+    projectId: typeof data.projectId === "string" ? data.projectId : undefined,
+  };
+}
+
+export function watchRemoteScreens(projectId: string | undefined, callback: (screens: RemoteScreen[]) => void, onError: (message: string) => void) {
   const db = firestore();
   if (!db) return () => undefined;
-  return onSnapshot(query(collection(db, "sduiScreens"), orderBy("updatedAt", "desc")), (snapshot) => {
-    callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as RemoteScreen)));
+  const isLegacy = !projectId || projectId === "legacy";
+  const source = isLegacy
+    ? query(collection(db, "sduiScreens"), orderBy("updatedAt", "desc"))
+    : query(collection(db, "sduiScreens"), where("projectId", "==", projectId));
+
+  return onSnapshot(source, (snapshot) => {
+    const screens = snapshot.docs
+      .map((item) => remoteScreen({ id: item.id, data: () => item.data() }))
+      .filter((screen) => isLegacy ? !screen.projectId || screen.projectId === "legacy" : screen.projectId === projectId)
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+    callback(screens);
   }, (error) => onError(error.message));
 }
 
-export async function loadRemoteVersions(screenId: string): Promise<RemoteVersion[]> {
+export async function loadRemoteVersions(screenId: string, projectId?: string): Promise<RemoteVersion[]> {
   const db = firestore();
   if (!db) return [];
-  const snapshot = await getDocs(query(collection(db, "sduiScreens", screenId, "versions"), orderBy("createdAt", "desc")));
+  const snapshot = await getDocs(query(collection(db, "sduiScreens", screenStorageId(screenId, projectId), "versions"), orderBy("createdAt", "desc")));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as RemoteVersion));
 }
 
@@ -43,14 +72,22 @@ export type StudioActor = {
   label: string;
 };
 
-export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt" | "createdBy"> & { screenId: string };
+export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt" | "createdBy"> & {
+  screenId: string;
+  projectId?: string;
+};
 
 export async function saveRemoteVersion(input: SaveRemoteVersionInput, actor: StudioActor) {
   const db = firestore();
   if (!db) throw new Error("Firebase is not configured.");
   const createdAt = Date.now();
   const versionId = input.status.toLowerCase() + "-" + createdAt;
-  await setDoc(doc(db, "sduiScreens", input.screenId), {
+  const storageId = screenStorageId(input.screenId, input.projectId);
+  const projectId = input.projectId && input.projectId !== "legacy" ? input.projectId : undefined;
+
+  await setDoc(doc(db, "sduiScreens", storageId), {
+    screenId: input.screenId,
+    ...(projectId ? { projectId } : {}),
     title: input.title,
     route: input.route,
     status: input.status,
@@ -58,15 +95,17 @@ export async function saveRemoteVersion(input: SaveRemoteVersionInput, actor: St
     updatedAt: createdAt,
     updatedBy: actor.label,
   }, { merge: true });
-  const { screenId, ...version } = input;
-  await setDoc(doc(db, "sduiScreens", screenId, "versions", versionId), {
+
+  const { screenId, projectId: _projectId, ...version } = input;
+  await setDoc(doc(db, "sduiScreens", storageId, "versions", versionId), {
     ...version,
+    ...(projectId ? { projectId } : {}),
     createdAt,
     createdBy: actor.label,
   });
+
   await writeStudioAudit(input.status === "Published" ? "screen_published" : "draft_saved", actor, {
     screenId: input.screenId,
-    targetLabel: input.title,
+    targetLabel: projectId ? input.title + " · " + projectId : input.title,
   });
 }
-
