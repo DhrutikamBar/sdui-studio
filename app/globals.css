@@ -381,3 +381,118 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
   .audit-row { grid-template-columns: 9px 1fr; }
   .audit-row time { grid-column: 2; }
 }
+
+
+/* Responsive workspace: desktop, tablet, phone, and narrow landscape */
+img, svg, canvas, textarea, select { max-width: 100%; }
+textarea { width: 100%; }
+.workspace, .studio-grid, .right-column, .editor-panel, .card, .governance-section, .preview-section { min-width: 0; }
+.top-actions > button, .import-actions > button { white-space: nowrap; }
+
+@media (max-width: 1320px) {
+  .workspace { padding-right: clamp(20px, 3vw, 40px); padding-left: clamp(20px, 3vw, 40px); }
+  .studio-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px); gap: 16px; }
+  .preview-section { padding: 36px clamp(24px, 5vw, 56px); }
+  .access-grid { grid-template-columns: minmax(250px, .8fr) minmax(340px, 1.2fr); }
+}
+
+@media (max-width: 1120px) {
+  .studio-grid { grid-template-columns: minmax(0, 1fr); }
+  .right-column { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .component-palette { grid-column: 1 / -1; }
+  .property-editor, .versions { height: fit-content; }
+  .preview-section { align-items: center; }
+  .access-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 860px) {
+  body { overflow-x: hidden; }
+  .studio-shell { display: block; }
+  .sidebar { position: static; width: 100%; height: auto; min-height: 0; max-height: none; padding: 16px; }
+  .sidebar-brand { padding: 2px 4px 14px; }
+  .workspace-switcher { display: none; }
+  .new-screen { display: inline-flex; width: auto; margin: 0 4px 12px; padding: 9px 11px; }
+  .sidebar-summary { display: none; }
+  .sidebar-label-row { margin-top: 2px; }
+  .screen-search { max-width: none; margin: 0 4px 10px; }
+  .sidebar nav { display: flex; overflow-x: auto; gap: 7px; padding: 0 4px 4px; scrollbar-width: none; }
+  .sidebar nav::-webkit-scrollbar { display: none; }
+  .screen-link { width: auto; flex: 0 0 auto; min-width: max-content; padding: 8px 10px; }
+  .sidebar-tools, .sidebar-footer { display: none; }
+  .workspace { padding: 22px 20px 44px; }
+  .app-topbar { margin-bottom: 22px; }
+  .workspace-insights { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .workspace-insights > div { padding: 12px; }
+  .workspace-insights strong { overflow-wrap: anywhere; font-size: 15px; }
+  .preview-section { min-height: 0; }
+}
+
+@media (max-width: 620px) {
+  .auth-showcase { display: none; }
+  .auth-page { display: grid; min-height: 100dvh; place-items: center; padding: 18px; background: radial-gradient(circle at 100% 0, #e8e7ff, transparent 18rem), #f7f8fc; }
+  .auth-card { width: 100%; max-width: 430px; margin: 0; padding: 24px 20px; border-radius: 16px; }
+  .auth-card h2 { font-size: 24px; }
+  .workspace { padding: 16px 12px 34px; }
+  .app-topbar { align-items: stretch; margin-bottom: 17px; padding-bottom: 14px; }
+  .app-brand em { display: none; }
+  .app-user { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+  .sync-state { min-width: 0; }
+  .sync-state small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .profile-chip { display: none; }
+  .logout-button { padding: 8px; border: 1px solid #e2e5ed; background: #fff; }
+  .topbar { align-items: stretch; gap: 14px; margin-bottom: 14px; }
+  h1 { font-size: 25px; }
+  .top-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .top-actions button { width: 100%; padding: 10px 7px; font-size: 11px; }
+  .top-actions .primary { grid-column: 1 / -1; }
+  .workspace-insights { grid-template-columns: 1fr; gap: 7px; margin-bottom: 13px; }
+  .workspace-insights > div { min-height: 0; padding: 11px 13px; }
+  .notice { margin-bottom: 14px; padding: 11px 12px; font-size: 12px; }
+  .editor-panel, .card { padding: 15px; border-radius: 12px; }
+  .panel-heading { align-items: flex-start; margin-bottom: 14px; }
+  .field-grid { grid-template-columns: 1fr; gap: 10px; margin-bottom: 12px; }
+  .import-bar { gap: 10px; padding: 12px; }
+  .import-actions { width: 100%; }
+  .import-actions .secondary { flex: 1; padding: 9px 7px; font-size: 11px; }
+  textarea { min-height: 390px; padding: 12px; font-size: 11px; }
+  .importer textarea { min-height: 160px; }
+  .right-column { grid-template-columns: 1fr; gap: 12px; }
+  .component-palette { grid-column: auto; }
+  .palette-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .palette-grid button { min-width: 0; padding: 8px; }
+  .layout-actions { grid-template-columns: 1fr 1fr; }
+  .binding-list button { overflow: hidden; }
+  .binding-list strong, .binding-list span, .binding-list small { overflow-wrap: anywhere; }
+  .compare-panel > div, .import-review-grid { grid-template-columns: 1fr; }
+  .version-actions { flex-wrap: wrap; }
+  .preview-section { margin-top: 18px; padding: 24px 16px; gap: 24px; border-radius: 14px; }
+  .preview-copy h2 { font-size: 23px; }
+  .phone-shell { width: min(244px, 100%); }
+  .governance-section { margin-top: 18px; padding: 16px; border-radius: 13px; }
+  .governance-heading h2 { font-size: 19px; }
+  .member-row { gap: 7px; }
+}
+
+@media (max-width: 390px) {
+  .sidebar { padding: 12px; }
+  .sidebar-brand small { display: none; }
+  .new-screen kbd { display: none; }
+  .top-actions { grid-template-columns: 1fr; }
+  .top-actions .primary { grid-column: auto; }
+  .palette-grid { grid-template-columns: 1fr; }
+  .layout-actions { grid-template-columns: 1fr; }
+  .scenario-picker, .preview-state { gap: 6px; }
+  .scenario-picker button, .preview-state button { padding: 6px 8px; font-size: 11px; }
+  .phone-shell { transform: scale(.94); transform-origin: center top; margin-bottom: -20px; }
+}
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .sidebar { position: static; }
+  .workspace { padding-top: 15px; }
+  .auth-showcase { display: none; }
+  .auth-page { grid-template-columns: 1fr; padding: 14px; }
+  .auth-card { width: min(520px, 100%); margin: 0 auto; }
+  .preview-section { flex-direction: row; align-items: flex-start; min-height: 0; padding: 20px; }
+  .phone-shell { height: 390px; transform: scale(.82); transform-origin: top center; margin-bottom: -72px; }
+  .phone-screen { height: 329px; }
+}
