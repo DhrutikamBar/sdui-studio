@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { validateSduiDocument } from "../lib/validate";
 import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToStudio, signOutOfStudio } from "../lib/firebase";
 import { loadRemoteVersions, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
+import { writeStudioAudit } from "../lib/studio-governance";
+import { StudioGovernancePanel } from "./governance-panel";
 
 type JsonObject = {
   type?: string;
@@ -592,6 +594,7 @@ export default function StudioPage() {
 
   function archiveScreen() {
     setScreens((current) => current.map((screen) => screen.id === selectedId ? { ...screen, status: "Archived", updatedAt: "Just now" } : screen));
+    if (firebaseUser) void writeStudioAudit("screen_archived", { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid }, { screenId: selectedId, targetLabel: title });
     const next = screens.find((screen) => screen.id !== selectedId && screen.status !== "Archived");
     if (next) void chooseScreen(next);
     setNotice("Screen archived. Enable archived screens in the sidebar to restore it.");
@@ -599,6 +602,7 @@ export default function StudioPage() {
 
   function restoreArchivedScreen() {
     setScreens((current) => current.map((screen) => screen.id === selectedId ? { ...screen, status: "Draft", updatedAt: "Just now" } : screen));
+    if (firebaseUser) void writeStudioAudit("screen_restored", { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid }, { screenId: selectedId, targetLabel: title });
     setNotice("Screen restored as a draft.");
   }
 
@@ -681,6 +685,7 @@ export default function StudioPage() {
     setTitle(version.title);
     setRoute(version.route);
     setJson(version.document);
+    if (firebaseUser) void writeStudioAudit("version_restored", { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid }, { screenId: selectedId, targetLabel: title + " v" + version.number });
     setNotice("Restored v" + version.number + " into the editor. Save it as a new draft before publishing.");
     setPendingRestore(null);
   }
@@ -1076,6 +1081,8 @@ export default function StudioPage() {
             </section>
           </aside>
         </div>
+
+        <StudioGovernancePanel actor={firebaseUser} />
 
         <section className="preview-section">
           <div className="preview-copy"><p className="eyebrow">LIVE PREVIEW</p><h2>Test real screen states</h2><p>Use the same document with representative API responses and failure states before it reaches Android or iOS.</p><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
