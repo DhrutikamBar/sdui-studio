@@ -10,7 +10,8 @@ export type SduiNode = {
 const widgetTypes = new Set([
   "column", "row", "box", "text", "button", "image", "icon", "spacer",
   "divider", "textInput", "checkbox", "switch", "tabs", "bottomNavigation",
-  "repeater", "list", "grid", "chip", "badge", "progressBar", "rating"
+  "repeater", "list", "grid", "lazyColumn", "lazyRow", "lazyGrid", "flowRow", "pager",
+  "chip", "badge", "progressBar", "rating"
 ]);
 
 const actionTypes = new Set([
