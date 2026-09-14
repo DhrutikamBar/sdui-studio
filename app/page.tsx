@@ -431,6 +431,7 @@ export default function StudioPage() {
   const [previewState, setPreviewState] = useState("content");
   const [showFloatingPreview, setShowFloatingPreview] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<"build" | "preview" | "governance">("build");
   const [sampleScenario, setSampleScenario] = useState("standard");
   const [showArchived, setShowArchived] = useState(false);
   const [screenSearch, setScreenSearch] = useState("");
@@ -868,6 +869,7 @@ export default function StudioPage() {
   const publishedCount = screens.filter((screen) => screen.status === "Published").length;
 
   async function chooseScreen(screen: Screen) {
+    setWorkspaceView("build");
     const fallback = screenDocuments[screen.id] ?? JSON.stringify(
       localScreenDocument(screen.title, "This bundled screen is ready to edit.", "Continue", "home", "#34415B"),
       null,
@@ -982,6 +984,13 @@ export default function StudioPage() {
           <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>SDUI Studio</strong><em>Workspace</em></div>
           <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
+        <nav className="workspace-view-tabs" aria-label="Studio workspace sections">
+          <button className={workspaceView === "build" ? "active" : ""} aria-current={workspaceView === "build" ? "page" : undefined} onClick={() => setWorkspaceView("build")}><span>◫</span><div><strong>Build</strong><small>Screen editor</small></div></button>
+          <button className={workspaceView === "preview" ? "active" : ""} aria-current={workspaceView === "preview" ? "page" : undefined} onClick={() => setWorkspaceView("preview")}><span>▣</span><div><strong>Preview</strong><small>Test states</small></div></button>
+          <button className={workspaceView === "governance" ? "active" : ""} aria-current={workspaceView === "governance" ? "page" : undefined} onClick={() => setWorkspaceView("governance")}><span>◈</span><div><strong>Governance</strong><small>People & activity</small></div></button>
+        </nav>
+
+        {workspaceView === "build" && <>
         <header className="topbar">
           <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">v{screens.find((screen) => screen.id === selectedId)?.version ?? 1} · {screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"} · Updated {screens.find((screen) => screen.id === selectedId)?.updatedAt ?? "now"}</small></div>
           <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
@@ -1086,12 +1095,15 @@ export default function StudioPage() {
           </aside>
         </div>
 
-        <StudioGovernancePanel actor={firebaseUser} />
+        </>}
+        {workspaceView === "governance" && <><div className="notice workspace-notice" role="status">Manage roles, access, and the immutable activity history for this workspace.</div><StudioGovernancePanel actor={firebaseUser} /></>}
+        {workspaceView === "preview" && <><div className="notice workspace-notice" role="status">Test the selected screen before publishing it. Preview data and failure states never change the live mobile screen.</div>
 
         <section className="preview-launcher">
           <div><p className="eyebrow">LIVE PREVIEW</p><h2>Open the mobile demo in a floating window</h2><p>Resize the preview while testing the same screen with representative API data and failure states.</p></div>
           <button className="primary preview-launch-button" onClick={() => setShowFloatingPreview(true)}>Open mobile preview</button>
         </section>
+        </>}
         {showFloatingPreview && <div className="floating-preview-backdrop" role="presentation">
           <section className="floating-preview-dialog" role="dialog" aria-modal="true" aria-label="Mobile screen preview">
             <header className="floating-preview-header"><div><p className="eyebrow">LIVE PREVIEW</p><strong>{title}</strong><small>Drag the lower-right corner to resize on desktop.</small></div><button className="logout-button" onClick={() => setShowFloatingPreview(false)} aria-label="Close mobile preview">Close</button></header>
