@@ -51,8 +51,10 @@ export async function loadStudioMember(uid: string): Promise<StudioMember | null
 export function observeStudioMembers(callback: (members: StudioMember[]) => void, onError: (message: string) => void) {
   const db = firestore();
   if (!db) return () => undefined;
-  return onSnapshot(query(collection(db, "studioUsers"), orderBy("email", "asc")), (snapshot) => {
-    callback(snapshot.docs.map((item) => memberFromSnapshot({ id: item.id, data: () => item.data() })));
+  return onSnapshot(collection(db, "studioUsers"), (snapshot) => {
+    callback(snapshot.docs
+      .map((item) => memberFromSnapshot({ id: item.id, data: () => item.data() }))
+      .sort((left, right) => left.email.localeCompare(right.email) || left.uid.localeCompare(right.uid)));
   }, (error) => onError(error.message));
 }
 
