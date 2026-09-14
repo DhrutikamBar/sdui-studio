@@ -943,7 +943,7 @@ export default function StudioPage() {
       setProjectError("Enter both a client project name and an Android/iOS package identifier.");
       return;
     }
-    if (!/^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$/.test(packageName)) {
+    if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(packageName)) {
       setProjectError("Use a package identifier such as com.acme.mobile.");
       return;
     }
