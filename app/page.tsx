@@ -394,7 +394,7 @@ export default function StudioPage() {
   const [firebaseUser, setFirebaseUser] = useState<{ uid: string; displayName: string | null; email: string | null } | null>(null);
   const [syncState, setSyncState] = useState<SyncState>("local");
   const [syncDetail, setSyncDetail] = useState("Local browser workspace");
-  const [showSignIn, setShowSignIn] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signInError, setSignInError] = useState("");
@@ -404,6 +404,7 @@ export default function StudioPage() {
     setFirebaseUser(user ? { uid: user.uid, displayName: user.displayName, email: user.email } : null);
     setSyncState("local");
     setSyncDetail(user ? "Signed in — connecting to shared workspace" : "Local browser workspace");
+    setAuthReady(true);
   }), []);
 
   useEffect(() => {
@@ -812,15 +813,12 @@ export default function StudioPage() {
     setNotice("Selected " + screen.title + ". Showing its own bundled draft.");
   }
 
-  async function toggleStudioSignIn() {
+  async function signOutFromStudio() {
     try {
-      if (firebaseUser) await signOutOfStudio();
-      else {
-        setSignInError("");
-        setShowSignIn(true);
-      }
+      await signOutOfStudio();
+      setNotice("Signed out of the shared workspace.");
     } catch (error) {
-      setNotice("Sign-in failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      setNotice("Sign-out failed: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   }
 
@@ -834,7 +832,6 @@ export default function StudioPage() {
     try {
       await signInToStudio(signInEmail.trim(), signInPassword);
       setSignInPassword("");
-      setShowSignIn(false);
       setNotice("Signed in. Connecting to the shared workspace…");
     } catch (error) {
       setSignInError(error instanceof Error ? error.message.replace("Firebase: ", "") : "Sign-in failed. Check your email and password.");
@@ -860,10 +857,19 @@ export default function StudioPage() {
     }
   }
 
+  if (!authReady) {
+    return <main className="auth-page"><div className="auth-loading"><span>◆</span><strong>Preparing SDUI Studio</strong><small>Checking your secure workspace…</small></div></main>;
+  }
+
+  if (!firebaseUser) {
+    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>SDUI Studio</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for SDUI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>Forgot password?</button><button className="primary auth-submit" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
+  }
+
+  const profileInitial = (firebaseUser.displayName ?? firebaseUser.email ?? "S").trim().charAt(0).toUpperCase();
+
   return (
-    <main>
+    <main className="studio-shell">
       <aside className="sidebar">
-        <div className="brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Control centre</small></div></div>
         <button className="new-screen" onClick={createScreen}>+ New screen</button>
         <div className="sidebar-label-row"><p className="sidebar-label">SCREENS</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Show archived"}</button></div>
         <nav>
@@ -873,13 +879,17 @@ export default function StudioPage() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer"><span className="avatar">DK</span><div><strong>DhrutikamBar</strong><small>Studio editor</small></div></div>
+        <div className="sidebar-footer"><span className="avatar">{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div>
       </aside>
 
       <section className="workspace">
+        <header className="app-topbar">
+          <div className="app-brand"><span>◆</span><strong>SDUI Studio</strong><em>Workspace</em></div>
+          <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
+        </header>
         <header className="topbar">
           <div><p className="eyebrow">SCREENS / {route.toUpperCase()}</p><h1>{title}</h1></div>
-          <div className="top-actions"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><button className="firebase-state" onClick={toggleStudioSignIn}>{firebaseUser ? "● " + (firebaseUser.email ?? "Signed in") + " — sign out" : isFirebaseConfigured ? "Sign in to sync" : "Firebase setup required"}</button><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
+          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
         </header>
 
         <div className="notice" role="status">{notice}</div>
@@ -978,7 +988,6 @@ export default function StudioPage() {
           <MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} />
         </section>
         {pendingRestore && <div className="dialog-backdrop"><section className="confirm-dialog"><h2>Restore version v{pendingRestore.number}?</h2><p>This replaces the document currently in the editor. It will remain a draft until you save and publish again.</p><div><button className="secondary" onClick={() => setPendingRestore(null)}>Cancel</button><button className="primary" onClick={confirmRestoreVersion}>Restore into draft</button></div></section></div>}
-        {showSignIn && <div className="dialog-backdrop"><section className="confirm-dialog sign-in-dialog"><p className="eyebrow">SHARED WORKSPACE</p><h2>Sign in to SDUI Studio</h2><p>Studio accounts are created by an administrator. Sign in to access shared drafts, versions, and publishing.</p><label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy} onClick={() => void requestPasswordReset()}>Forgot password?</button><div><button className="secondary" disabled={signInBusy} onClick={() => setShowSignIn(false)}>Cancel</button><button className="primary" disabled={signInBusy} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in"}</button></div></section></div>}
       </section>
     </main>
   );
