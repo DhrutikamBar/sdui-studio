@@ -204,6 +204,16 @@ const localScreenDocuments: Record<string, JsonObject> = {
   settings: localScreenDocument("Settings", "Manage notifications and preferences.", "Return home", "home", "#34415B")
 };
 
+function uniqueRoute(baseRoute: string, screens: Screen[]): string {
+  const route = baseRoute.trim().replace(/^\/+|\/+$/g, "") || "screen";
+  const existingRoutes = new Set(screens.map((screen) => screen.route));
+  if (!existingRoutes.has(route)) return route;
+
+  let suffix = 2;
+  while (existingRoutes.has(route + "-" + suffix)) suffix += 1;
+  return route + "-" + suffix;
+}
+
 const bindings = [
   ["user.firstName", "Profile / first name"],
   ["user.name", "Profile / full name"],
@@ -527,6 +537,17 @@ export default function StudioPage() {
       setNotice("Publishing blocked: add a short release note.");
       return;
     }
+    if (!route.trim()) {
+      setNotice("Publishing blocked: give this screen a route.");
+      return;
+    }
+    const routeConflict = screens.find((screen) =>
+      screen.id !== selectedId && screen.status !== "Archived" && screen.route === route
+    );
+    if (routeConflict) {
+      setNotice("Publishing blocked: /" + route + " is already used by " + routeConflict.title + ".");
+      return;
+    }
     const nextVersion = (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1;
     setScreens((current) => current.map((screen) =>
       screen.id === selectedId ? { ...screen, title, route, status: "Published", version: nextVersion, updatedAt: "Just now" } : screen
@@ -557,7 +578,8 @@ export default function StudioPage() {
 
   function duplicateScreen() {
     const id = selectedId + "-copy-" + Date.now();
-    const copy: Screen = { id, title: title + " copy", route: route + "-copy", status: "Draft", version: 0, updatedAt: "Just now" };
+    const copyRoute = uniqueRoute(route + "-copy", screens);
+    const copy: Screen = { id, title: title + " copy", route: copyRoute, status: "Draft", version: 0, updatedAt: "Just now" };
     setScreens((current) => [...current, copy]);
     setSelectedId(id);
     setTitle(copy.title);
@@ -583,11 +605,12 @@ export default function StudioPage() {
   function createScreen() {
     const name = "New screen";
     const id = "screen-" + Date.now();
-    const newScreen: Screen = { id, route: "new-screen", title: name, status: "Draft", version: 0, updatedAt: "Just now" };
+    const newRoute = uniqueRoute("new-screen", screens);
+    const newScreen: Screen = { id, route: newRoute, title: name, status: "Draft", version: 0, updatedAt: "Just now" };
     setScreens((current) => [...current, newScreen]);
     setSelectedId(id);
     setTitle(name);
-    setRoute("new-screen");
+    setRoute(newRoute);
     const document = JSON.stringify({ type: "column", props: { style: { padding: "md" } }, children: [] }, null, 2);
     setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: document }));
     setJson(document);
