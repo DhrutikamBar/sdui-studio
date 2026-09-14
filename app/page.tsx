@@ -419,6 +419,7 @@ export default function StudioPage() {
   const [previewState, setPreviewState] = useState("content");
   const [sampleScenario, setSampleScenario] = useState("standard");
   const [showArchived, setShowArchived] = useState(false);
+  const [screenSearch, setScreenSearch] = useState("");
   const [publishNote, setPublishNote] = useState("");
   const [previewConfirmed, setPreviewConfirmed] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
@@ -818,6 +819,9 @@ export default function StudioPage() {
   const selectedProps = (selectedNode?.props ?? {}) as Record<string, unknown>;
   const selectedStyle = (selectedProps.style ?? {}) as Record<string, unknown>;
   const activeSampleData = sampleScenarios[sampleScenario].data;
+  const activeScreens = screens.filter((screen) => showArchived || screen.status !== "Archived");
+  const visibleScreens = activeScreens.filter((screen) => (screen.title + " " + screen.route).toLowerCase().includes(screenSearch.trim().toLowerCase()));
+  const publishedCount = screens.filter((screen) => screen.status === "Published").length;
 
   async function chooseScreen(screen: Screen) {
     const fallback = screenDocuments[screen.id] ?? JSON.stringify(
@@ -909,15 +913,21 @@ export default function StudioPage() {
   return (
     <main className="studio-shell">
       <aside className="sidebar">
-        <button className="new-screen" onClick={createScreen}>+ New screen</button>
-        <div className="sidebar-label-row"><p className="sidebar-label">SCREENS</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Show archived"}</button></div>
-        <nav>
-          {screens.filter((screen) => showArchived || screen.status !== "Archived").map((screen) => (
+        <div className="sidebar-brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
+        <div className="workspace-switcher"><span>WORKSPACE</span><strong>Mobile experience</strong><small>Firestore connected</small></div>
+        <button className="new-screen" onClick={createScreen}><b>＋</b> New screen <kbd>N</kbd></button>
+        <div className="sidebar-summary"><div><strong>{activeScreens.length}</strong><span>screens</span></div><div><strong>{publishedCount}</strong><span>live</span></div><div><strong>{syncState === "saved" ? "●" : "○"}</strong><span>sync</span></div></div>
+        <div className="sidebar-label-row"><p className="sidebar-label">SCREEN LIBRARY</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Archived"}</button></div>
+        <label className="screen-search"><span>⌕</span><input value={screenSearch} onChange={(event) => setScreenSearch(event.target.value)} placeholder="Find a screen" /></label>
+        <nav aria-label="Screen library">
+          {visibleScreens.map((screen) => (
             <button key={screen.id} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => chooseScreen(screen)}>
-              <span>{screen.title}</span><em className={screen.status === "Published" ? "published" : screen.status === "Archived" ? "archived" : "draft"}>{screen.status}</em>
+              <span><b>{screen.title.slice(0, 1).toUpperCase()}</b>{screen.title}</span><em className={screen.status === "Published" ? "published" : screen.status === "Archived" ? "archived" : "draft"}>{screen.status}</em>
             </button>
           ))}
+          {!visibleScreens.length && <p className="sidebar-empty">No screens found</p>}
         </nav>
+        <div className="sidebar-tools"><p className="sidebar-label">WORKSPACE TOOLS</p><div><span>◈</span><small>Versioned publishing</small></div><div><span>⌁</span><small>Data binding ready</small></div><div><span>✓</span><small>{syncDetail}</small></div></div>
         <div className="sidebar-footer"><span className="avatar">{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div>
       </aside>
 
@@ -927,9 +937,10 @@ export default function StudioPage() {
           <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
         <header className="topbar">
-          <div><p className="eyebrow">SCREENS / {route.toUpperCase()}</p><h1>{title}</h1></div>
+          <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">v{screens.find((screen) => screen.id === selectedId)?.version ?? 1} · {screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"} · Updated {screens.find((screen) => screen.id === selectedId)?.updatedAt ?? "now"}</small></div>
           <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
         </header>
+        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"}</strong><small>{publishedCount} published screen{publishedCount === 1 ? "" : "s"} in this workspace</small></div></section>
 
         <div className="notice" role="status">{notice}</div>
 
