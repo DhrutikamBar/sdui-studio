@@ -6,6 +6,7 @@ import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToS
 import { loadRemoteVersions, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
 import { writeStudioAudit } from "../lib/studio-governance";
 import { StudioGovernancePanel } from "./governance-panel";
+import { createStudioProject, legacyProject, watchStudioProjects, type StudioProject } from "../lib/studio-projects";
 
 type JsonObject = {
   type?: string;
@@ -412,6 +413,12 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
 
 export default function StudioPage() {
   const [screens, setScreens] = useState(initialScreens);
+  const [projects, setProjects] = useState<StudioProject[]>([legacyProject]);
+  const [selectedProjectId, setSelectedProjectId] = useState(legacyProject.id);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [projectPackageName, setProjectPackageName] = useState("");
+  const [projectError, setProjectError] = useState("");
   const [selectedId, setSelectedId] = useState("wallet");
   const [title, setTitle] = useState("Wallet");
   const [route, setRoute] = useState("wallet");
@@ -463,7 +470,16 @@ export default function StudioPage() {
 
   useEffect(() => {
     if (!firebaseUser) return;
-    return watchRemoteScreens((remote) => {
+    return watchStudioProjects(firebaseUser.uid, (remoteProjects) => {
+      setProjects([legacyProject, ...remoteProjects.filter((project) => project.id !== legacyProject.id)]);
+    }, (message) => {
+      setNotice("Project list could not load: " + message);
+    });
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    return watchRemoteScreens(selectedProjectId === legacyProject.id ? undefined : selectedProjectId, (remote) => {
       if (!remote.length) return;
       // Firestore may initially contain only the screen that was just saved.
       // Merge that metadata into the local/bundled catalog rather than replacing it,
@@ -487,7 +503,7 @@ export default function StudioPage() {
       setSyncDetail("Shared sync needs attention");
       setNotice("Firestore sync is unavailable: " + message);
     });
-  }, [firebaseUser]);
+  }, [firebaseUser, selectedProjectId]);
 
   const parsed = useMemo(() => {
     try {
@@ -515,7 +531,7 @@ export default function StudioPage() {
       try {
         setSyncState("syncing");
         setSyncDetail("Saving draft to shared workspace…");
-        await saveRemoteVersion({ screenId: selectedId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+        await saveRemoteVersion({ screenId: selectedId, projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
         setSyncState("saved");
         setSyncDetail("Draft saved to shared workspace");
         setNotice("Draft snapshot saved to Firestore.");
@@ -565,7 +581,7 @@ export default function StudioPage() {
       try {
         setSyncState("syncing");
         setSyncDetail("Publishing to shared workspace…");
-        await saveRemoteVersion({ screenId: selectedId, number: nextVersion, status: "Published", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+        await saveRemoteVersion({ screenId: selectedId, projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId, number: nextVersion, status: "Published", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
         setSyncState("saved");
         setSyncDetail("Published version saved to shared workspace");
         setNotice("Published v" + nextVersion + " to Firestore.");
@@ -867,6 +883,23 @@ export default function StudioPage() {
   const activeScreens = screens.filter((screen) => showArchived || screen.status !== "Archived");
   const visibleScreens = activeScreens.filter((screen) => (screen.title + " " + screen.route).toLowerCase().includes(screenSearch.trim().toLowerCase()));
   const publishedCount = screens.filter((screen) => screen.status === "Published").length;
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? legacyProject;
+
+  function chooseProject(project: StudioProject) {
+    setSelectedProjectId(project.id);
+    setScreens(initialScreens);
+    setSelectedId("wallet");
+    setTitle("Wallet");
+    setRoute("wallet");
+    setJson(JSON.stringify(starterDocument, null, 2));
+    setScreenDocuments(Object.fromEntries(Object.entries(localScreenDocuments).map(([id, document]) => [id, JSON.stringify(document, null, 2)])));
+    setVersions({});
+    setSelectedPath([]);
+    setNestingTargetPath(null);
+    setWorkspaceView("build");
+    setMobileMenuOpen(false);
+    setNotice("Opened " + project.name + ". Its screen catalog and versions are isolated from other client projects.");
+  }
 
   async function chooseScreen(screen: Screen) {
     setWorkspaceView("build");
@@ -884,7 +917,7 @@ export default function StudioPage() {
     setNestingTargetPath(null);
     if (firebaseUser) {
       try {
-        const remoteVersions = await loadRemoteVersions(screen.id);
+        const remoteVersions = await loadRemoteVersions(screen.id, selectedProjectId === legacyProject.id ? undefined : selectedProjectId);
         if (remoteVersions.length) {
           setVersions((current) => ({ ...current, [screen.id]: remoteVersions.map((item) => ({ ...item, createdAt: new Date(item.createdAt).toLocaleString() })) }));
           const latest = remoteVersions[0];
@@ -900,6 +933,31 @@ export default function StudioPage() {
       }
     }
     setNotice("Selected " + screen.title + ". Showing its own bundled draft.");
+  }
+
+  async function submitProject() {
+    if (!firebaseUser) return;
+    const name = projectName.trim();
+    const packageName = projectPackageName.trim();
+    if (!name || !packageName) {
+      setProjectError("Enter both a client project name and an Android/iOS package identifier.");
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$/.test(packageName)) {
+      setProjectError("Use a package identifier such as com.acme.mobile.");
+      return;
+    }
+    try {
+      setProjectError("");
+      const project = await createStudioProject({ name, packageName }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+      setProjects((current) => current.some((item) => item.id === project.id) ? current : [...current, project]);
+      setShowProjectDialog(false);
+      setProjectName("");
+      setProjectPackageName("");
+      chooseProject(project);
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : "Project creation failed. Check your Studio role and Firestore rules.");
+    }
   }
 
   async function signOutFromStudio() {
@@ -961,7 +1019,8 @@ export default function StudioPage() {
       <aside className={"sidebar " + (mobileMenuOpen ? "mobile-open" : "")}>
         <button className="mobile-drawer-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close screen library">×</button>
         <div className="sidebar-brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
-        <div className="workspace-switcher"><span>WORKSPACE</span><strong>Mobile experience</strong><small>Firestore connected</small></div>
+        <div className="workspace-switcher"><span>CLIENT PROJECT</span><select value={selectedProjectId} onChange={(event) => chooseProject(projects.find((project) => project.id === event.target.value) ?? legacyProject)} aria-label="Active client project">{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><small>{selectedProject.packageName}</small></div>
+        <button className="project-create-button" onClick={() => { setProjectError(""); setShowProjectDialog(true); }}>＋ New client project</button>
         <button className="new-screen" onClick={createScreen}><b>＋</b> New screen <kbd>N</kbd></button>
         <div className="sidebar-summary"><div><strong>{activeScreens.length}</strong><span>screens</span></div><div><strong>{publishedCount}</strong><span>live</span></div><div><strong>{syncState === "saved" ? "●" : "○"}</strong><span>sync</span></div></div>
         <div className="sidebar-label-row"><p className="sidebar-label">SCREEN LIBRARY</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Archived"}</button></div>
@@ -981,9 +1040,10 @@ export default function StudioPage() {
 
       <section className="workspace">
         <header className="app-topbar">
-          <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>SDUI Studio</strong><em>Workspace</em></div>
+          <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>SDUI Studio</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
           <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
+        {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}
         <nav className="workspace-view-tabs" aria-label="Studio workspace sections">
           <button className={workspaceView === "build" ? "active" : ""} aria-current={workspaceView === "build" ? "page" : undefined} onClick={() => setWorkspaceView("build")}><span>◫</span><div><strong>Build</strong><small>Screen editor</small></div></button>
           <button className={workspaceView === "preview" ? "active" : ""} aria-current={workspaceView === "preview" ? "page" : undefined} onClick={() => setWorkspaceView("preview")}><span>▣</span><div><strong>Preview</strong><small>Test states</small></div></button>
