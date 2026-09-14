@@ -34,6 +34,23 @@ service cloud.firestore {
       return request.resource.data.role in ['designer', 'reviewer', 'admin'];
     }
 
+    function projectMember(projectId) {
+      return canReadStudio()
+        && request.auth.uid in get(/databases/$(database)/documents/studioProjects/$(projectId)).data.memberIds;
+    }
+
+    function canReadProject(projectId) {
+      return projectId == 'legacy' ? canReadStudio() : projectMember(projectId);
+    }
+
+    function canEditProject(projectId) {
+      return projectId == 'legacy' ? canEditStudio() : (canEditStudio() && projectMember(projectId));
+    }
+
+    function projectId(data) {
+      return data.get('projectId', 'legacy');
+    }
+
     // Accounts are created in Firebase Authentication by an administrator.
     // Studio admins grant, change, or revoke Studio access through these records.
     match /studioUsers/{userId} {
@@ -46,7 +63,23 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Immutable audit history. The authenticated UID is written into every event.
+    // A project is the tenancy boundary for a client. Only approved members can see it.
+    match /studioProjects/{projectId} {
+      allow read: if canReadStudio() && request.auth.uid in resource.data.memberIds;
+      allow create: if isAdmin()
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.name is string
+        && request.resource.data.packageName is string
+        && request.resource.data.memberIds is list;
+      allow update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.packageName is string
+        && request.resource.data.memberIds is list;
+      allow delete: if false;
+    }
+
+    // Immutable organisation audit history. A production deployment can additionally
+    // scope this collection by project for client-specific audit exports.
     match /studioAudit/{auditId} {
       allow read: if canReadStudio();
       allow create: if canEditStudio()
@@ -56,16 +89,19 @@ service cloud.firestore {
     }
 
     match /sduiScreens/{screenId} {
-      allow read: if canReadStudio();
-      allow create, update: if canEditStudio();
-      allow delete: if isAdmin();
+      allow read: if canReadProject(projectId(resource.data));
+      allow create: if canEditProject(projectId(request.resource.data));
+      allow update: if projectId(request.resource.data) == projectId(resource.data)
+        && canEditProject(projectId(resource.data));
+      allow delete: if isAdmin() && canEditProject(projectId(resource.data));
 
       // Versions are append-only. An accidental edit cannot silently rewrite history.
       match /versions/{versionId} {
-        allow read: if canReadStudio();
-        allow create: if canEditStudio();
+        allow read: if canReadProject(projectId(get(/databases/$(database)/documents/sduiScreens/$(screenId)).data));
+        allow create: if canEditProject(projectId(get(/databases/$(database)/documents/sduiScreens/$(screenId)).data));
         allow update: if false;
-        allow delete: if isAdmin();
+        allow delete: if isAdmin()
+          && canEditProject(projectId(get(/databases/$(database)/documents/sduiScreens/$(screenId)).data));
       }
     }
   }
