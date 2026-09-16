@@ -1,8 +1,8 @@
-export type SduiNode = {
+export type FlexflowNode = {
   type?: string;
   id?: string;
   props?: Record<string, unknown>;
-  children?: SduiNode[];
+  children?: FlexflowNode[];
   action?: { type?: string; target?: string };
   [key: string]: unknown;
 };
@@ -20,7 +20,7 @@ const actionTypes = new Set([
 
 const bindingRoots = new Set(["user", "wallet", "transactions", "item", "index"]);
 
-export function validateSduiDocument(value: unknown): string[] {
+export function validateFlexflowDocument(value: unknown): string[] {
   const errors: string[] = [];
 
   function validateNode(node: unknown, path: string) {
@@ -29,7 +29,7 @@ export function validateSduiDocument(value: unknown): string[] {
       return;
     }
 
-    const valueNode = node as SduiNode;
+    const valueNode = node as FlexflowNode;
     if (!valueNode.type || !widgetTypes.has(valueNode.type)) {
       errors.push(path + " has an unsupported widget type.");
     }

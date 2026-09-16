@@ -1,4 +1,4 @@
-export type SduiValue = string | number | boolean | null | SduiValue[] | { [key: string]: SduiValue };
+export type FlexflowValue = string | number | boolean | null | FlexflowValue[] | { [key: string]: FlexflowValue };
 
 export interface FigmaLikePaint {
   type: string;
@@ -31,7 +31,7 @@ export interface ConversionWarning {
 }
 
 export interface ConversionResult {
-  document: SduiValue;
+  document: FlexflowValue;
   warnings: ConversionWarning[];
 }
 
@@ -53,7 +53,7 @@ export function convertSelectedNode(node: FigmaLikeNode): ConversionResult {
 function convertNode(
   node: FigmaLikeNode,
   warnings: ConversionWarning[],
-): { [key: string]: SduiValue } | null {
+): { [key: string]: FlexflowValue } | null {
   if (node.visible === false) {
     warnings.push(warning(node, "Hidden layer was omitted."));
     return null;
@@ -69,7 +69,7 @@ function convertNode(
       type: "repeater",
       props: {
         items: "{{" + directive.value + "}}",
-        ...(styleOf(node, warnings)),
+        style: styleOf(node, warnings),
       },
       children: template,
     };
@@ -82,7 +82,7 @@ function convertNode(
       type: "text",
       props: {
         value,
-        ...(styleOf(node, warnings)),
+        style: styleOf(node, warnings),
       },
     };
   }
@@ -92,8 +92,8 @@ function convertNode(
     return {
       type: "button",
       props: {
-        text: label,
-        ...(styleOf(node, warnings)),
+        label,
+        style: styleOf(node, warnings),
       },
       action: route
         ? { type: "navigate", target: route }
@@ -118,7 +118,7 @@ function convertNode(
 
   return {
     type,
-    props: styleOf(node, warnings),
+    props: { style: styleOf(node, warnings) },
     ...(children.length ? { children } : {}),
   };
 }
@@ -126,7 +126,7 @@ function convertNode(
 function childrenOf(node: FigmaLikeNode, warnings: ConversionWarning[]) {
   return (node.children ?? [])
     .map((child) => convertNode(child, warnings))
-    .filter((child): child is { [key: string]: SduiValue } => child !== null);
+    .filter((child): child is { [key: string]: FlexflowValue } => child !== null);
 }
 
 function containerTypeFor(node: FigmaLikeNode) {
@@ -144,19 +144,22 @@ function isUnsupportedVisual(type: string) {
 }
 
 function styleOf(node: FigmaLikeNode, warnings: ConversionWarning[]) {
-  const props: { [key: string]: SduiValue } = {};
+  const props: { [key: string]: FlexflowValue } = {};
   const padding = Math.max(node.paddingTop ?? 0, node.paddingRight ?? 0, node.paddingBottom ?? 0, node.paddingLeft ?? 0);
   if (padding > 0) props.padding = spacingToken(padding);
-  if (node.itemSpacing && node.itemSpacing > 0) props.gap = spacingToken(node.itemSpacing);
+  if (node.itemSpacing && node.itemSpacing > 0) {
+    warnings.push(warning(node, "Auto Layout item spacing needs a manual layout review."));
+  }
   if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
     props.cornerRadius = Math.round(node.cornerRadius);
   }
 
   const fill = node.fills?.find((paint) => paint.visible !== false);
   if (fill?.type === "SOLID" && fill.color) {
-    props.backgroundColor = toHex(fill.color);
+    if (node.type === "TEXT") props.color = toHex(fill.color);
+    else props.background = toHex(fill.color);
   } else if (fill && fill.type !== "SOLID") {
-    warnings.push(warning(node, "Gradient and image fills need a manual SDUI resource/style choice."));
+    warnings.push(warning(node, "Gradient and image fills need a manual FlexFlow UI resource/style choice."));
   }
   return props;
 }
@@ -175,7 +178,7 @@ function toHex(color: { r: number; g: number; b: number }) {
 }
 
 function parseDirective(name: string): { kind: string; value: string } | null {
-  const match = name.match(/(?:^|\s)sdui:([a-z-]+)(?::([^\s]+))?/i);
+  const match = name.match(/(?:^|\s)flexflow:([a-z-]+)(?::([^\s]+))?/i);
   return match ? { kind: match[1].toLowerCase(), value: match[2]?.trim() ?? "" } : null;
 }
 
@@ -200,7 +203,7 @@ function findFirstText(node: FigmaLikeNode): string | null {
 
 function normalizeName(name: string) {
   return name
-    .replace(/^(sdui|bind):/i, "")
+    .replace(/^(flexflow|bind):/i, "")
     .replace(/[^a-z0-9]+/gi, "_")
     .replace(/^_|_$/g, "")
     .toLowerCase() || "figma_component";
