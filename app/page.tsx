@@ -602,6 +602,7 @@ export default function StudioPage() {
   }
 
   function duplicateScreen() {
+    screenLoadGeneration.current += 1;
     const id = selectedId + "-copy-" + Date.now();
     const copyRoute = uniqueRoute(route + "-copy", screens);
     const copy: Screen = { id, title: title + " copy", route: copyRoute, status: "Draft", version: 0, updatedAt: "Just now" };
@@ -656,6 +657,7 @@ export default function StudioPage() {
   }
 
   function createScreen() {
+    screenLoadGeneration.current += 1;
     const name = "New screen";
     const id = "screen-" + Date.now();
     const newRoute = uniqueRoute("new-screen", screens);
