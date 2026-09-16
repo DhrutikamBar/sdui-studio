@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { validateFlexflowDocument } from "../lib/validate";
+import { collectionBindingPath } from "../lib/preview-bindings";
 import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToStudio, signOutOfStudio } from "../lib/firebase";
-import { loadRemoteVersions, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
+import { loadRemoteVersions, saveRemoteScreenStatus, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
 import { writeStudioAudit } from "../lib/studio-governance";
 import { StudioGovernancePanel } from "./governance-panel";
 import { createStudioProject, legacyProject, watchStudioProjects, type StudioProject } from "../lib/studio-projects";
@@ -301,7 +302,7 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
     if (props.visible === false) return null;
     if (node.type === "repeater") {
       const rawItems = props.items;
-      const path = typeof rawItems === "string" ? rawItems.replace(/[{}\s]/g, "") : "";
+      const path = collectionBindingPath(rawItems);
       const items = getValue(path, scope);
       if (!Array.isArray(items)) return null;
       return items.map((item, index) =>
@@ -316,7 +317,7 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
       const isGrid = node.type === "lazyGrid" || node.type === "grid";
       const columns = typeof props.columns === "number" ? Math.max(1, Math.floor(props.columns)) : 2;
       const rawItems = props.items;
-      const path = typeof rawItems === "string" ? rawItems.replace(/[{}\\s]/g, "") : "";
+      const path = collectionBindingPath(rawItems);
       const boundItems = getValue(path, scope);
       const renderedItems = Array.isArray(boundItems)
         ? boundItems.flatMap((item, index) => children.map((child, childIndex) => ({ child, scope: { ...scope, item, index }, key: key + "-" + index + "-" + childIndex })))
@@ -412,6 +413,7 @@ function MobilePreview({ document, data, state, onRetry }: { document: JsonObjec
 }
 
 export default function StudioPage() {
+  const screenLoadGeneration = useRef(0);
   const [screens, setScreens] = useState(initialScreens);
   const [projects, setProjects] = useState<StudioProject[]>([legacyProject]);
   const [selectedProjectId, setSelectedProjectId] = useState(legacyProject.id);
@@ -460,8 +462,10 @@ export default function StudioPage() {
   const [signInPassword, setSignInPassword] = useState("");
   const [signInError, setSignInError] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
+  const [screenStatusBusy, setScreenStatusBusy] = useState(false);
 
   useEffect(() => observeStudioUser((user) => {
+    screenLoadGeneration.current += 1;
     setFirebaseUser(user ? { uid: user.uid, displayName: user.displayName, email: user.email } : null);
     setSyncState("local");
     setSyncDetail(user ? "Signed in — connecting to shared workspace" : "Local browser workspace");
@@ -611,18 +615,44 @@ export default function StudioPage() {
     setNotice("Created a draft copy. Give it a unique route before publishing.");
   }
 
-  function archiveScreen() {
-    setScreens((current) => current.map((screen) => screen.id === selectedId ? { ...screen, status: "Archived", updatedAt: "Just now" } : screen));
-    if (firebaseUser) void writeStudioAudit("screen_archived", { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid }, { screenId: selectedId, targetLabel: title });
-    const next = screens.find((screen) => screen.id !== selectedId && screen.status !== "Archived");
-    if (next) void chooseScreen(next);
-    setNotice("Screen archived. Enable archived screens in the sidebar to restore it.");
-  }
-
-  function restoreArchivedScreen() {
-    setScreens((current) => current.map((screen) => screen.id === selectedId ? { ...screen, status: "Draft", updatedAt: "Just now" } : screen));
-    if (firebaseUser) void writeStudioAudit("screen_restored", { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid }, { screenId: selectedId, targetLabel: title });
-    setNotice("Screen restored as a draft.");
+  async function changeScreenArchivedStatus(status: "Draft" | "Archived") {
+    if (screenStatusBusy) return;
+    const screen = screens.find((item) => item.id === selectedId);
+    if (!screen) return;
+    const requestGeneration = screenLoadGeneration.current;
+    setScreenStatusBusy(true);
+    try {
+      if (firebaseUser) {
+        setSyncState("syncing");
+        setSyncDetail(status === "Archived" ? "Archiving screen…" : "Restoring screen…");
+        await saveRemoteScreenStatus({
+          screenId: screen.id,
+          projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId,
+          title: screen.title,
+          route: screen.route,
+          version: screen.version,
+          status,
+        }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+      }
+      if (screenLoadGeneration.current !== requestGeneration) return;
+      setScreens((current) => current.map((item) => item.id === screen.id ? { ...item, status, updatedAt: "Just now" } : item));
+      setSyncState(firebaseUser ? "saved" : "local");
+      setSyncDetail(firebaseUser ? "Shared workspace is in sync" : "Local browser workspace");
+      if (status === "Archived") {
+        const next = screens.find((item) => item.id !== screen.id && item.status !== "Archived");
+        if (next) void chooseScreen(next);
+        setNotice("Screen archived. Enable archived screens in the sidebar to restore it.");
+      } else {
+        setNotice("Screen restored as a draft.");
+      }
+    } catch (error) {
+      if (screenLoadGeneration.current !== requestGeneration) return;
+      setSyncState("failed");
+      setSyncDetail("Shared sync needs attention");
+      setNotice("Screen status could not be saved: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setScreenStatusBusy(false);
+    }
   }
 
   function createScreen() {
@@ -886,6 +916,7 @@ export default function StudioPage() {
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? legacyProject;
 
   function chooseProject(project: StudioProject) {
+    screenLoadGeneration.current += 1;
     setSelectedProjectId(project.id);
     setScreens(initialScreens);
     setSelectedId("wallet");
@@ -902,6 +933,7 @@ export default function StudioPage() {
   }
 
   async function chooseScreen(screen: Screen) {
+    const requestGeneration = ++screenLoadGeneration.current;
     setWorkspaceView("build");
     const fallback = screenDocuments[screen.id] ?? JSON.stringify(
       localScreenDocument(screen.title, "This bundled screen is ready to edit.", "Continue", "home", "#34415B"),
@@ -918,6 +950,7 @@ export default function StudioPage() {
     if (firebaseUser) {
       try {
         const remoteVersions = await loadRemoteVersions(screen.id, selectedProjectId === legacyProject.id ? undefined : selectedProjectId);
+        if (screenLoadGeneration.current !== requestGeneration) return;
         if (remoteVersions.length) {
           setVersions((current) => ({ ...current, [screen.id]: remoteVersions.map((item) => ({ ...item, createdAt: new Date(item.createdAt).toLocaleString() })) }));
           const latest = remoteVersions[0];
@@ -928,11 +961,12 @@ export default function StudioPage() {
           return;
         }
       } catch (error) {
+        if (screenLoadGeneration.current !== requestGeneration) return;
         setNotice("Selected " + screen.title + ". Using bundled draft because Firestore versions could not load: " + (error instanceof Error ? error.message : "Unknown error"));
         return;
       }
     }
-    setNotice("Selected " + screen.title + ". Showing its own bundled draft.");
+    if (screenLoadGeneration.current === requestGeneration) setNotice("Selected " + screen.title + ". Showing its current draft.");
   }
 
   async function submitProject() {
@@ -1053,7 +1087,7 @@ export default function StudioPage() {
         {workspaceView === "build" && <>
         <header className="topbar">
           <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">v{screens.find((screen) => screen.id === selectedId)?.version ?? 1} · {screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"} · Updated {screens.find((screen) => screen.id === selectedId)?.updatedAt ?? "now"}</small></div>
-          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" onClick={restoreArchivedScreen}>Restore screen</button> : <button className="secondary" onClick={archiveScreen}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
+          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
         </header>
         <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"}</strong><small>{publishedCount} published screen{publishedCount === 1 ? "" : "s"} in this workspace</small></div></section>
 
