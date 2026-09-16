@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types tests/phase-one.test.mjs",
     "lint": "npm run typecheck",
     "typecheck:plugin": "tsc -p figma-plugin/tsconfig.json --noEmit",
     "build:plugin": "node scripts/build-figma-plugin.mjs"

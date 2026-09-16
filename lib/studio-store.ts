@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, where } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, where, writeBatch } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { writeStudioAudit } from "./studio-governance";
 
@@ -6,7 +6,7 @@ export type RemoteScreen = {
   id: string;
   route: string;
   title: string;
-  status: "Draft" | "Published";
+  status: "Draft" | "Published" | "Archived";
   version: number;
   updatedAt: number;
   updatedBy?: string;
@@ -35,7 +35,7 @@ function remoteScreen(item: { id: string; data: () => Record<string, unknown> })
     id: typeof data.screenId === "string" ? data.screenId : item.id,
     route: typeof data.route === "string" ? data.route : item.id,
     title: typeof data.title === "string" ? data.title : item.id,
-    status: data.status === "Published" ? "Published" : "Draft",
+    status: data.status === "Published" || data.status === "Archived" ? data.status : "Draft",
     version: typeof data.version === "number" ? data.version : 1,
     updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
     updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : undefined,
@@ -71,6 +71,39 @@ export type StudioActor = {
   uid: string;
   label: string;
 };
+
+export async function saveRemoteScreenStatus(input: {
+  screenId: string;
+  projectId?: string;
+  title: string;
+  route: string;
+  version: number;
+  status: "Draft" | "Archived";
+}, actor: StudioActor) {
+  const db = firestore();
+  if (!db) throw new Error("Firebase is not configured.");
+  const projectId = input.projectId && input.projectId !== "legacy" ? input.projectId : undefined;
+  const batch = writeBatch(db);
+  batch.set(doc(db, "sduiScreens", screenStorageId(input.screenId, projectId)), {
+    screenId: input.screenId,
+    ...(projectId ? { projectId } : {}),
+    title: input.title,
+    route: input.route,
+    version: input.version,
+    status: input.status,
+    updatedAt: Date.now(),
+    updatedBy: actor.label,
+  }, { merge: true });
+  batch.set(doc(collection(db, "studioAudit")), {
+    action: input.status === "Archived" ? "screen_archived" : "screen_restored",
+    actorUid: actor.uid,
+    actorLabel: actor.label,
+    screenId: input.screenId,
+    targetLabel: projectId ? input.title + " · " + projectId : input.title,
+    createdAt: Date.now(),
+  });
+  await batch.commit();
+}
 
 export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt" | "createdBy"> & {
   screenId: string;

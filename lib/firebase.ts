@@ -25,7 +25,11 @@ export function firestore() {
 
 export function observeStudioUser(callback: (user: User | null) => void) {
   const firebaseApp = app();
-  return firebaseApp ? onAuthStateChanged(getAuth(firebaseApp), callback) : () => undefined;
+  if (!firebaseApp) {
+    callback(null);
+    return () => undefined;
+  }
+  return onAuthStateChanged(getAuth(firebaseApp), callback);
 }
 
 export async function signInToStudio(email: string, password: string) {
