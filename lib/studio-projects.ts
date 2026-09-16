@@ -14,7 +14,7 @@ export type StudioProject = {
 export const legacyProject: StudioProject = {
   id: "legacy",
   name: "Demo workspace",
-  packageName: "com.example.sdui",
+  packageName: "com.example.flexflow",
   memberIds: [],
   createdAt: 0,
   updatedAt: 0,

@@ -4,7 +4,7 @@ import "./globals.css";
 import "./auth-shell.css";
 
 export const metadata: Metadata = {
-  title: "SDUI Studio",
+  title: "FlexFlow UI",
   description: "Admin portal for server-driven mobile UI"
 };
 

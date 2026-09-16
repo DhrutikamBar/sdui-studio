@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { validateSduiDocument } from "../lib/validate";
+import { validateFlexflowDocument } from "../lib/validate";
 import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToStudio, signOutOfStudio } from "../lib/firebase";
 import { loadRemoteVersions, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
 import { writeStudioAudit } from "../lib/studio-governance";
@@ -508,7 +508,7 @@ export default function StudioPage() {
   const parsed = useMemo(() => {
     try {
       const document = JSON.parse(json) as JsonObject;
-      const errors = validateSduiDocument(document);
+      const errors = validateFlexflowDocument(document);
       return { document: errors.length === 0 ? document : null, error: errors.join(" ") };
     } catch (error) {
       return { document: null, error: error instanceof Error ? error.message : "Invalid JSON" };
@@ -656,13 +656,13 @@ export default function StudioPage() {
     try {
       const imported = JSON.parse(importText) as JsonObject;
       const document = (imported.document && typeof imported.document === "object" ? imported.document : imported) as JsonObject;
-      const errors = validateSduiDocument(document);
+      const errors = validateFlexflowDocument(document);
       if (errors.length) {
         setNotice("Import blocked: " + errors.join(" "));
         return;
       }
       const exporterWarnings = Array.isArray(imported.warnings) ? imported.warnings.filter((warning): warning is string => typeof warning === "string") : [];
-      setImportCandidate({ document, source: imported.document ? "Figma exporter" : "SDUI JSON", warnings: [...exporterWarnings, ...inspectImport(document)] });
+      setImportCandidate({ document, source: imported.document ? "Figma exporter" : "FlexFlow UI JSON", warnings: [...exporterWarnings, ...inspectImport(document)] });
       setNotice("Import is valid and ready for review. Apply it only after checking the review panel.");
     } catch {
       setNotice("Import blocked: paste a complete JSON document from Studio or the Figma exporter.");
@@ -1005,11 +1005,11 @@ export default function StudioPage() {
   }
 
   if (!authReady) {
-    return <main className="auth-page"><div className="auth-loading"><span>◆</span><strong>Preparing SDUI Studio</strong><small>Checking your secure workspace…</small></div></main>;
+    return <main className="auth-page"><div className="auth-loading"><span>◆</span><strong>Preparing FlexFlow UI</strong><small>Checking your secure workspace…</small></div></main>;
   }
 
   if (!firebaseUser) {
-    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>SDUI Studio</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for SDUI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>Forgot password?</button><button className="primary auth-submit" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
+    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>FlexFlow UI</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for FlexFlow UI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>Forgot password?</button><button className="primary auth-submit" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
   }
 
   const profileInitial = (firebaseUser.displayName ?? firebaseUser.email ?? "S").trim().charAt(0).toUpperCase();
@@ -1018,7 +1018,7 @@ export default function StudioPage() {
     <main className="studio-shell">
       <aside className={"sidebar " + (mobileMenuOpen ? "mobile-open" : "")}>
         <button className="mobile-drawer-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close screen library">×</button>
-        <div className="sidebar-brand"><span>◆</span><div><strong>SDUI Studio</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
+        <div className="sidebar-brand"><span>◆</span><div><strong>FlexFlow UI</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
         <div className="workspace-switcher"><span>CLIENT PROJECT</span><select value={selectedProjectId} onChange={(event) => chooseProject(projects.find((project) => project.id === event.target.value) ?? legacyProject)} aria-label="Active client project">{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><small>{selectedProject.packageName}</small></div>
         <button className="project-create-button" onClick={() => { setProjectError(""); setShowProjectDialog(true); }}>＋ New client project</button>
         <button className="new-screen" onClick={createScreen}><b>＋</b> New screen <kbd>N</kbd></button>
@@ -1040,7 +1040,7 @@ export default function StudioPage() {
 
       <section className="workspace">
         <header className="app-topbar">
-          <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>SDUI Studio</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
+          <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
           <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
         {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}
@@ -1061,7 +1061,7 @@ export default function StudioPage() {
 
         <div className="studio-grid">
           <section className="editor-panel">
-            <div className="panel-heading"><div><h2>Screen document</h2><p>Use the form fields for basics or edit the SDUI document directly.</p></div><span className={parsed.error ? "invalid" : "valid"}>{parsed.error ? "Invalid JSON" : "Valid JSON"}</span></div>
+            <div className="panel-heading"><div><h2>Screen document</h2><p>Use the form fields for basics or edit the FlexFlow UI document directly.</p></div><span className={parsed.error ? "invalid" : "valid"}>{parsed.error ? "Invalid JSON" : "Valid JSON"}</span></div>
 
             <div className="field-grid">
               <label>Screen name<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
@@ -1069,12 +1069,12 @@ export default function StudioPage() {
             </div>
 
             <div className="import-bar">
-              <div><strong>Import or export a document</strong><span>Review Figma-export JSON safely, or download this draft as portable SDUI JSON.</span></div>
+              <div><strong>Import or export a document</strong><span>Review Figma-export JSON safely, or download this draft as portable FlexFlow UI JSON.</span></div>
               <div className="import-actions"><button className="secondary" onClick={() => exportDocument(json, "draft")}>Export draft</button>
               <button className="secondary" onClick={() => setShowImporter((value) => !value)}>{showImporter ? "Close import" : "Import JSON"}</button>
               </div>
             </div>
-            {showImporter && <div className="importer"><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste SDUI JSON or Figma exporter output here…" /><button className="primary" onClick={stageImport}>Validate for review</button>{importCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{importCandidate.source}</strong><p>The incoming document is valid. Applying it replaces the editor draft, not any published version.</p></div><div className="import-review-grid"><div><small>Incoming JSON</small><pre>{JSON.stringify(importCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{importCandidate.warnings.length ? <ul>{importCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={cancelImportReview}>Keep current draft</button><button className="primary" onClick={applyImport}>Apply to draft</button></div></div>}</div>}
+            {showImporter && <div className="importer"><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste FlexFlow UI JSON or Figma exporter output here…" /><button className="primary" onClick={stageImport}>Validate for review</button>{importCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{importCandidate.source}</strong><p>The incoming document is valid. Applying it replaces the editor draft, not any published version.</p></div><div className="import-review-grid"><div><small>Incoming JSON</small><pre>{JSON.stringify(importCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{importCandidate.warnings.length ? <ul>{importCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={cancelImportReview}>Keep current draft</button><button className="primary" onClick={applyImport}>Apply to draft</button></div></div>}</div>}
 
             <label className="json-label">Advanced document editor<textarea value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} /></label>
             {parsed.error && <p className="error-message">{parsed.error}</p>}

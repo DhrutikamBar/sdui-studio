@@ -22,8 +22,8 @@
     </style>
   </head>
   <body>
-    <h1>SDUI Figma Exporter</h1>
-    <p>Convert one selected frame into a starting SDUI document. Review the result before publishing it.</p>
+    <h1>FlexFlow UI Exporter</h1>
+    <p>Convert one selected frame into a starting FlexFlow UI document. Review the result before publishing it.</p>
 
     <div class="selection" id="selection">Choose a frame, component, or group in Figma.</div>
     <button class="primary" id="convert">Convert selection</button>
@@ -31,15 +31,15 @@
     <p class="error hidden" id="error"></p>
 
     <section id="result" class="hidden">
-      <h2>SDUI JSON</h2>
+      <h2>FlexFlow UI JSON</h2>
       <pre id="json"></pre>
       <h2 id="warningsTitle">Conversion notes</h2>
       <ul id="warnings"></ul>
     </section>
 
     <div class="hint">
-      Naming conventions: <strong>sdui:button</strong>, <strong>route:wallet</strong>,
-      <strong>bind:user.name</strong>, and <strong>sdui:repeater:transactions</strong>.
+      Naming conventions: <strong>flexflow:button</strong>, <strong>route:wallet</strong>,
+      <strong>bind:user.name</strong>, and <strong>flexflow:repeater:transactions</strong>.
       Auto-layout maps to rows and columns.
     </div>
 

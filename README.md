@@ -1,8 +1,8 @@
-# SDUI Studio
+# FlexFlow UI
 
-SDUI Studio is an internal admin portal for creating, previewing, versioning, and publishing Server-Driven UI documents.
+FlexFlow UI is an internal portal for creating, previewing, versioning, and publishing mobile interface documents.
 
-It also contains a focused **Figma-to-SDUI exporter**: a local Figma development plugin that converts a selected design frame into a reviewable SDUI JSON starting point.
+It also includes **FlexFlow UI Exporter**, a local Figma development plugin that converts a selected design frame into a reviewable JSON starting point.
 
 ## First MVP capabilities
 
@@ -16,14 +16,14 @@ It also contains a focused **Figma-to-SDUI exporter**: a local Figma development
 
 ## Figma exporter
 
-The exporter intentionally produces a safe starting document rather than claiming perfect, arbitrary Figma reproduction. It maps Auto Layout to SDUI rows/columns, text to SDUI text, and recognises the conventions below:
+The exporter produces a starting document for review. It maps Auto Layout to rows and columns, text layers to text components, and recognises the conventions below:
 
 | Figma layer name | Result |
 | --- | --- |
-| `sdui:button` | SDUI button |
+| `flexflow:button` | FlexFlow UI button |
 | `route:wallet` in a button name | Navigate action to `wallet` |
 | `bind:user.name` on a text layer | `{{user.name}}` data binding |
-| `sdui:repeater:transactions` | Repeater bound to `{{transactions}}` |
+| `flexflow:repeater:transactions` | Repeater bound to `{{transactions}}` |
 | Vertical / horizontal Auto Layout | Column / row |
 
 Unsupported vectors, images, and gradient fills are reported as conversion notes so a designer or developer can make an explicit resource decision.
@@ -40,7 +40,7 @@ In the Figma desktop app:
 1. Open **Plugins → Development → Import plugin from manifest…**
 2. Select `figma-plugin/manifest.json` from this repository.
 3. Select one frame, component, or group.
-4. Run **SDUI Figma Exporter**, choose **Convert selection**, review the notes, then copy the JSON into Studio.
+4. Run **FlexFlow UI Exporter**, choose **Convert selection**, review the notes, then copy the JSON into FlexFlow UI.
 
 ## Safety model
 
@@ -53,12 +53,12 @@ Studio works locally until a user signs in with an administrator-created email/p
 The shared data structure is:
 
 ```text
-sduiScreens/{screenId}                    screen metadata
-sduiScreens/{screenId}/versions/{version} immutable draft or published document
+screen collection/{screenId}             screen metadata
+screen collection/{screenId}/versions/{version} immutable draft or published document
 studioUsers/{firebaseUid}                 role record
 ```
 
-`firestore.rules` is deliberately secure by default. Add each approved Firebase Authentication user to the `studioUsers` collection from the Firebase Console before using Studio:
+The current collection identifier remains in `lib/studio-store.ts` for compatibility with existing Firestore data. `firestore.rules` is deliberately secure by default. Add each approved Firebase Authentication user to the `studioUsers` collection from the Firebase Console before using FlexFlow UI:
 
 ```json
 // Document ID: the user's Firebase Authentication UID
