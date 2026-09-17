@@ -105,6 +105,20 @@ npm run dev
 
 Then open the localhost link shown in the terminal.
 
+## Browser release checks
+
+Phase 4 runs the signed-in editor against local Firebase Authentication and Firestore emulators. It creates throwaway admin and reviewer accounts in the `demo-flexflow-ui` emulator project; no live Firebase credentials or data are used. The browser checks cover desktop, tablet, phone, and narrow phone widths, including draft save, preview states, publish validation, live-versus-draft labels, archive/restore, keyboard drawer behavior, and reviewer role denial.
+
+Install Java 21 and a Playwright Chromium browser, then run:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+GitHub CI runs the same checks on every pull request and `main` push. Failed runs upload a Playwright report and trace for diagnosis.
+
 
 
 ## Client projects (multi-tenant workspaces)

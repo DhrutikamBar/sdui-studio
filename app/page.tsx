@@ -1011,7 +1011,7 @@ export default function StudioPage() {
     setJson(fallback);
     setSelectedPath([]);
     setNestingTargetPath(null);
-    if (firebaseUser) {
+    if (firebaseUser && (screen.version > 0 || screen.latestDraftVersion)) {
       try {
         const remoteVersions = await loadRemoteVersions(screen.id, selectedProjectId === legacyProject.id ? undefined : selectedProjectId);
         if (screenLoadGeneration.current !== requestGeneration) return;

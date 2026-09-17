@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { connectAuthEmulator, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, type Auth, type User } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -18,9 +18,31 @@ function app(): FirebaseApp | null {
   return getApps().length ? getApp() : initializeApp(config);
 }
 
+function useLocalEmulators() {
+  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true"
+    && typeof window !== "undefined"
+    && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+}
+
+function studioAuth(firebaseApp: FirebaseApp): Auth {
+  const auth = getAuth(firebaseApp);
+  if (useLocalEmulators() && !auth.emulatorConfig) {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  }
+  return auth;
+}
+
+let emulatedFirestore: Firestore | null = null;
+
 export function firestore() {
   const firebaseApp = app();
-  return firebaseApp ? getFirestore(firebaseApp) : null;
+  if (!firebaseApp) return null;
+  const db = getFirestore(firebaseApp);
+  if (useLocalEmulators() && emulatedFirestore !== db) {
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    emulatedFirestore = db;
+  }
+  return db;
 }
 
 export function observeStudioUser(callback: (user: User | null) => void) {
@@ -29,18 +51,18 @@ export function observeStudioUser(callback: (user: User | null) => void) {
     callback(null);
     return () => undefined;
   }
-  return onAuthStateChanged(getAuth(firebaseApp), callback);
+  return onAuthStateChanged(studioAuth(firebaseApp), callback);
 }
 
 export async function signInToStudio(email: string, password: string) {
   const firebaseApp = app();
   if (!firebaseApp) throw new Error("Firebase is not configured for this deployment.");
-  await signInWithEmailAndPassword(getAuth(firebaseApp), email, password);
+  await signInWithEmailAndPassword(studioAuth(firebaseApp), email, password);
 }
 
 export async function studioIdToken(): Promise<string> {
   const firebaseApp = app();
-  const user = firebaseApp ? getAuth(firebaseApp).currentUser : null;
+  const user = firebaseApp ? studioAuth(firebaseApp).currentUser : null;
   if (!user) throw new Error("Sign in before saving to the shared workspace.");
   return user.getIdToken();
 }
@@ -48,11 +70,11 @@ export async function studioIdToken(): Promise<string> {
 export async function resetStudioPassword(email: string) {
   const firebaseApp = app();
   if (!firebaseApp) throw new Error("Firebase is not configured for this deployment.");
-  await sendPasswordResetEmail(getAuth(firebaseApp), email);
+  await sendPasswordResetEmail(studioAuth(firebaseApp), email);
 }
 
 export async function signOutOfStudio() {
   const firebaseApp = app();
-  if (firebaseApp) await signOut(getAuth(firebaseApp));
+  if (firebaseApp) await signOut(studioAuth(firebaseApp));
 }
 
