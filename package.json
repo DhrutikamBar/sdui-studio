@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types tests/all.test.mjs",
+    "test:e2e": "npx --yes firebase-tools@15.30.1 emulators:exec --project demo-flexflow-ui --only auth,firestore \"node scripts/seed-e2e.mjs && playwright test\"",
     "lint": "npm run typecheck",
     "typecheck:plugin": "tsc -p figma-plugin/tsconfig.json --noEmit",
     "build:plugin": "node scripts/build-figma-plugin.mjs"
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@figma/plugin-typings": "1.118.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "22.15.3",
     "@types/react": "19.1.2",
     "@types/react-dom": "19.1.2",
