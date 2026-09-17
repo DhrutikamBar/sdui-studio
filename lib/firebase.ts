@@ -38,6 +38,13 @@ export async function signInToStudio(email: string, password: string) {
   await signInWithEmailAndPassword(getAuth(firebaseApp), email, password);
 }
 
+export async function studioIdToken(): Promise<string> {
+  const firebaseApp = app();
+  const user = firebaseApp ? getAuth(firebaseApp).currentUser : null;
+  if (!user) throw new Error("Sign in before saving to the shared workspace.");
+  return user.getIdToken();
+}
+
 export async function resetStudioPassword(email: string) {
   const firebaseApp = app();
   if (!firebaseApp) throw new Error("Firebase is not configured for this deployment.");

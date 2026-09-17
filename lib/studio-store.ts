@@ -1,6 +1,5 @@
-import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, where, writeBatch } from "firebase/firestore";
-import { firestore } from "./firebase";
-import { writeStudioAudit } from "./studio-governance";
+import { collection, getDocs, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { firestore, studioIdToken } from "./firebase";
 
 export type RemoteScreen = {
   id: string;
@@ -8,6 +7,8 @@ export type RemoteScreen = {
   title: string;
   status: "Draft" | "Published" | "Archived";
   version: number;
+  publishedVersion?: number;
+  latestDraftVersion?: number;
   updatedAt: number;
   updatedBy?: string;
   projectId?: string;
@@ -20,6 +21,7 @@ export type RemoteVersion = {
   title: string;
   route: string;
   document: string;
+  note?: string;
   createdAt: number;
   createdBy?: string;
   projectId?: string;
@@ -37,6 +39,8 @@ function remoteScreen(item: { id: string; data: () => Record<string, unknown> })
     title: typeof data.title === "string" ? data.title : item.id,
     status: data.status === "Published" || data.status === "Archived" ? data.status : "Draft",
     version: typeof data.version === "number" ? data.version : 1,
+    publishedVersion: typeof data.publishedVersion === "number" ? data.publishedVersion : undefined,
+    latestDraftVersion: typeof data.latestDraftVersion === "number" ? data.latestDraftVersion : undefined,
     updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
     updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : undefined,
     projectId: typeof data.projectId === "string" ? data.projectId : undefined,
@@ -63,82 +67,44 @@ export function watchRemoteScreens(projectId: string | undefined, callback: (scr
 export async function loadRemoteVersions(screenId: string, projectId?: string): Promise<RemoteVersion[]> {
   const db = firestore();
   if (!db) return [];
-  const snapshot = await getDocs(query(collection(db, "sduiScreens", screenStorageId(screenId, projectId), "versions"), orderBy("createdAt", "desc")));
+  const snapshot = await getDocs(query(collection(db, "sduiScreens", screenStorageId(screenId, projectId), "versions"), orderBy("number", "desc")));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as RemoteVersion));
 }
-
-export type StudioActor = {
-  uid: string;
-  label: string;
-};
 
 export async function saveRemoteScreenStatus(input: {
   screenId: string;
   projectId?: string;
   title: string;
   route: string;
-  version: number;
   status: "Draft" | "Archived";
-}, actor: StudioActor) {
-  const db = firestore();
-  if (!db) throw new Error("Firebase is not configured.");
-  const projectId = input.projectId && input.projectId !== "legacy" ? input.projectId : undefined;
-  const batch = writeBatch(db);
-  batch.set(doc(db, "sduiScreens", screenStorageId(input.screenId, projectId)), {
-    screenId: input.screenId,
-    ...(projectId ? { projectId } : {}),
-    title: input.title,
-    route: input.route,
-    version: input.version,
-    status: input.status,
-    updatedAt: Date.now(),
-    updatedBy: actor.label,
-  }, { merge: true });
-  batch.set(doc(collection(db, "studioAudit")), {
-    action: input.status === "Archived" ? "screen_archived" : "screen_restored",
-    actorUid: actor.uid,
-    actorLabel: actor.label,
-    screenId: input.screenId,
-    targetLabel: projectId ? input.title + " · " + projectId : input.title,
-    createdAt: Date.now(),
+}): Promise<{ screenStatus: "Draft" | "Published" | "Archived" }> {
+  const token = await studioIdToken();
+  const response = await fetch("/api/screens/versions", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify(input),
   });
-  await batch.commit();
+  const result = await response.json() as { screenStatus: "Draft" | "Published" | "Archived"; error?: string };
+  if (!response.ok) throw new Error(result.error || "Screen status could not be saved.");
+  return result;
 }
 
-export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt" | "createdBy"> & {
+export type SaveRemoteVersionInput = Omit<RemoteVersion, "id" | "createdAt" | "createdBy" | "number"> & {
   screenId: string;
   projectId?: string;
+  previewConfirmed?: boolean;
 };
 
-export async function saveRemoteVersion(input: SaveRemoteVersionInput, actor: StudioActor) {
-  const db = firestore();
-  if (!db) throw new Error("Firebase is not configured.");
-  const createdAt = Date.now();
-  const versionId = input.status.toLowerCase() + "-" + createdAt;
-  const storageId = screenStorageId(input.screenId, input.projectId);
-  const projectId = input.projectId && input.projectId !== "legacy" ? input.projectId : undefined;
+export type SavedRemoteVersion = RemoteVersion & { publishedVersion: number; screenStatus: "Draft" | "Published" };
 
-  await setDoc(doc(db, "sduiScreens", storageId), {
-    screenId: input.screenId,
-    ...(projectId ? { projectId } : {}),
-    title: input.title,
-    route: input.route,
-    status: input.status,
-    version: input.number,
-    updatedAt: createdAt,
-    updatedBy: actor.label,
-  }, { merge: true });
-
-  const { screenId, projectId: _projectId, ...version } = input;
-  await setDoc(doc(db, "sduiScreens", storageId, "versions", versionId), {
-    ...version,
-    ...(projectId ? { projectId } : {}),
-    createdAt,
-    createdBy: actor.label,
+export async function saveRemoteVersion(input: SaveRemoteVersionInput): Promise<SavedRemoteVersion> {
+  const token = await studioIdToken();
+  const response = await fetch("/api/screens/versions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ ...input, kind: input.status }),
   });
-
-  await writeStudioAudit(input.status === "Published" ? "screen_published" : "draft_saved", actor, {
-    screenId: input.screenId,
-    targetLabel: projectId ? input.title + " · " + projectId : input.title,
-  });
+  const result = await response.json() as SavedRemoteVersion & { error?: string };
+  if (!response.ok) throw new Error(result.error || "Version could not be saved.");
+  return result;
 }

@@ -24,6 +24,7 @@ type Screen = {
   title: string;
   status: "Draft" | "Published" | "Archived";
   version: number;
+  latestDraftVersion?: number;
   updatedAt: string;
 };
 
@@ -463,6 +464,8 @@ export default function StudioPage() {
   const [signInError, setSignInError] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
   const [screenStatusBusy, setScreenStatusBusy] = useState(false);
+  const [versionSaveBusy, setVersionSaveBusy] = useState(false);
+  const versionSaveInFlight = useRef(false);
 
   useEffect(() => observeStudioUser((user) => {
     screenLoadGeneration.current += 1;
@@ -524,28 +527,31 @@ export default function StudioPage() {
       setNotice("Fix the JSON error before saving.");
       return;
     }
-    setScreens((current) => current.map((screen) =>
-      screen.id === selectedId ? { ...screen, title, route, status: "Draft", updatedAt: "Just now" } : screen
-    ));
-    setVersions((current) => ({
-      ...current,
-      [selectedId]: [{ id: selectedId + "-draft-" + Date.now(), number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json, createdAt: "Just now" }, ...(current[selectedId] ?? [])]
-    }));
-    if (firebaseUser) {
-      try {
-        setSyncState("syncing");
-        setSyncDetail("Saving draft to shared workspace…");
-        await saveRemoteVersion({ screenId: selectedId, projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId, number: (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1, status: "Draft", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
-        setSyncState("saved");
-        setSyncDetail("Draft saved to shared workspace");
-        setNotice("Draft snapshot saved to Firestore.");
-      } catch (error) {
-        setSyncState("failed");
-        setSyncDetail("Draft saved locally — shared save failed");
-        setNotice("Local draft saved, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
-      }
-    } else {
-      setNotice(isFirebaseConfigured ? "Draft saved locally. Sign in to save it to Firestore." : "Draft snapshot saved locally. Add Firebase environment variables to enable shared storage.");
+    if (!firebaseUser) { setNotice("Sign in before saving a draft."); return; }
+    if (versionSaveInFlight.current) return;
+    versionSaveInFlight.current = true;
+    setVersionSaveBusy(true);
+    const screenId = selectedId;
+    const requestGeneration = screenLoadGeneration.current;
+    try {
+      setSyncState("syncing");
+      setSyncDetail("Saving draft to shared workspace…");
+      const saved = await saveRemoteVersion({ screenId, projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId, status: "Draft", title, route, document: json });
+      if (screenLoadGeneration.current !== requestGeneration) return;
+      setScreens((current) => current.map((screen) => screen.id === screenId ? { ...screen, status: saved.screenStatus, version: saved.publishedVersion, latestDraftVersion: saved.number, title: saved.publishedVersion ? screen.title : title, route: saved.publishedVersion ? screen.route : route, updatedAt: "Just now" } : screen));
+      setVersions((current) => ({ ...current, [screenId]: [{ ...saved, createdAt: "Just now" }, ...(current[screenId] ?? [])] }));
+      setScreenDocuments((current) => ({ ...current, [screenId]: json }));
+      setSyncState("saved");
+      setSyncDetail("Draft saved to shared workspace");
+      setNotice(saved.publishedVersion ? "Draft v" + saved.number + " saved. Published v" + saved.publishedVersion + " remains live." : "Draft v" + saved.number + " saved to Firestore.");
+    } catch (error) {
+      if (screenLoadGeneration.current !== requestGeneration) return;
+      setSyncState("failed");
+      setSyncDetail("Shared save needs confirmation");
+      setNotice("Could not confirm the draft save. Refresh its status before retrying: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      versionSaveInFlight.current = false;
+      setVersionSaveBusy(false);
     }
   }
 
@@ -573,32 +579,34 @@ export default function StudioPage() {
       setNotice("Publishing blocked: /" + route + " is already used by " + routeConflict.title + ".");
       return;
     }
-    const nextVersion = (screens.find((screen) => screen.id === selectedId)?.version ?? 0) + 1;
-    setScreens((current) => current.map((screen) =>
-      screen.id === selectedId ? { ...screen, title, route, status: "Published", version: nextVersion, updatedAt: "Just now" } : screen
-    ));
-    setVersions((current) => ({
-      ...current,
-      [selectedId]: [{ id: selectedId + "-v" + nextVersion, number: nextVersion, status: "Published", title, route, document: json, createdAt: "Just now", note: publishNote.trim() }, ...(current[selectedId] ?? [])]
-    }));
-    if (firebaseUser) {
-      try {
-        setSyncState("syncing");
-        setSyncDetail("Publishing to shared workspace…");
-        await saveRemoteVersion({ screenId: selectedId, projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId, number: nextVersion, status: "Published", title, route, document: json }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
-        setSyncState("saved");
-        setSyncDetail("Published version saved to shared workspace");
-        setNotice("Published v" + nextVersion + " to Firestore.");
-      } catch (error) {
-        setSyncState("failed");
-        setSyncDetail("Published locally — shared publish failed");
-        setNotice("Local version published, but Firestore rejected the write: " + (error instanceof Error ? error.message : "Unknown error"));
-      }
-    } else {
-      setNotice(isFirebaseConfigured ? "Local version published. Sign in before publishing to Firestore." : "Published locally as v" + nextVersion + ". Add Firebase environment variables to publish for the mobile SDK.");
+    if (!firebaseUser) { setNotice("Sign in before publishing."); return; }
+    if (versionSaveInFlight.current) return;
+    versionSaveInFlight.current = true;
+    setVersionSaveBusy(true);
+    const screenId = selectedId;
+    const requestGeneration = screenLoadGeneration.current;
+    try {
+      setSyncState("syncing");
+      setSyncDetail("Publishing to shared workspace…");
+      const saved = await saveRemoteVersion({ screenId, projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId, status: "Published", title, route, document: json, note: publishNote.trim(), previewConfirmed });
+      if (screenLoadGeneration.current !== requestGeneration) return;
+      setScreens((current) => current.map((screen) => screen.id === screenId ? { ...screen, title, route, status: "Published", version: saved.number, latestDraftVersion: undefined, updatedAt: "Just now" } : screen));
+      setVersions((current) => ({ ...current, [screenId]: [{ ...saved, createdAt: "Just now" }, ...(current[screenId] ?? [])] }));
+      setScreenDocuments((current) => ({ ...current, [screenId]: json }));
+      setSyncState("saved");
+      setSyncDetail("Published version saved to shared workspace");
+      setNotice("Published v" + saved.number + " to Firestore.");
+      setPublishNote("");
+      setPreviewConfirmed(false);
+    } catch (error) {
+      if (screenLoadGeneration.current !== requestGeneration) return;
+      setSyncState("failed");
+      setSyncDetail("Publish needs confirmation");
+      setNotice("Could not confirm the publish. Refresh its status before retrying: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      versionSaveInFlight.current = false;
+      setVersionSaveBusy(false);
     }
-    setPublishNote("");
-    setPreviewConfirmed(false);
   }
 
   function duplicateScreen() {
@@ -623,20 +631,21 @@ export default function StudioPage() {
     const requestGeneration = screenLoadGeneration.current;
     setScreenStatusBusy(true);
     try {
+      let savedStatus: Screen["status"] = status;
       if (firebaseUser) {
         setSyncState("syncing");
         setSyncDetail(status === "Archived" ? "Archiving screen…" : "Restoring screen…");
-        await saveRemoteScreenStatus({
+        const result = await saveRemoteScreenStatus({
           screenId: screen.id,
           projectId: selectedProjectId === legacyProject.id ? undefined : selectedProjectId,
           title: screen.title,
           route: screen.route,
-          version: screen.version,
           status,
-        }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
+        });
+        savedStatus = result.screenStatus;
       }
       if (screenLoadGeneration.current !== requestGeneration) return;
-      setScreens((current) => current.map((item) => item.id === screen.id ? { ...item, status, updatedAt: "Just now" } : item));
+      setScreens((current) => current.map((item) => item.id === screen.id ? { ...item, status: savedStatus, updatedAt: "Just now" } : item));
       setSyncState(firebaseUser ? "saved" : "local");
       setSyncDetail(firebaseUser ? "Shared workspace is in sync" : "Local browser workspace");
       if (status === "Archived") {
@@ -644,7 +653,7 @@ export default function StudioPage() {
         if (next) void chooseScreen(next);
         setNotice("Screen archived. Enable archived screens in the sidebar to restore it.");
       } else {
-        setNotice("Screen restored as a draft.");
+        setNotice(savedStatus === "Published" ? "Screen restored; its published version is live again." : "Screen restored as a draft.");
       }
     } catch (error) {
       if (screenLoadGeneration.current !== requestGeneration) return;
@@ -916,6 +925,10 @@ export default function StudioPage() {
   const visibleScreens = activeScreens.filter((screen) => (screen.title + " " + screen.route).toLowerCase().includes(screenSearch.trim().toLowerCase()));
   const publishedCount = screens.filter((screen) => screen.status === "Published").length;
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? legacyProject;
+  const selectedScreen = screens.find((screen) => screen.id === selectedId);
+  const screenVersionLabel = selectedScreen?.latestDraftVersion
+    ? "Draft v" + selectedScreen.latestDraftVersion + (selectedScreen.version ? " · Live v" + selectedScreen.version : " · Not published")
+    : "v" + (selectedScreen?.version ?? 0) + " · " + (selectedScreen?.status ?? "Draft");
 
   function chooseProject(project: StudioProject) {
     screenLoadGeneration.current += 1;
@@ -956,6 +969,8 @@ export default function StudioPage() {
         if (remoteVersions.length) {
           setVersions((current) => ({ ...current, [screen.id]: remoteVersions.map((item) => ({ ...item, createdAt: new Date(item.createdAt).toLocaleString() })) }));
           const latest = remoteVersions[0];
+          setTitle(latest.title);
+          setRoute(latest.route);
           setJson(latest.document);
           setScreenDocuments((current) => ({ ...current, [screen.id]: latest.document }));
         } else {
@@ -1088,10 +1103,10 @@ export default function StudioPage() {
 
         {workspaceView === "build" && <>
         <header className="topbar">
-          <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">v{screens.find((screen) => screen.id === selectedId)?.version ?? 1} · {screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"} · Updated {screens.find((screen) => screen.id === selectedId)?.updatedAt ?? "now"}</small></div>
-          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" onClick={saveDraft}>Save draft</button><button className="primary" onClick={publish}>Publish version</button></div>
+          <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">{screenVersionLabel} · Updated {selectedScreen?.updatedAt ?? "now"}</small></div>
+          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" disabled={versionSaveBusy} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy} onClick={publish}>Publish version</button></div>
         </header>
-        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{screens.find((screen) => screen.id === selectedId)?.status ?? "Draft"}</strong><small>{publishedCount} published screen{publishedCount === 1 ? "" : "s"} in this workspace</small></div></section>
+        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{selectedScreen?.status === "Published" ? "Published v" + selectedScreen.version : selectedScreen?.status ?? "Draft"}</strong><small>{selectedScreen?.latestDraftVersion ? "Draft v" + selectedScreen.latestDraftVersion + " saved for review" : publishedCount + " published screen" + (publishedCount === 1 ? "" : "s") + " in this workspace"}</small></div></section>
 
         <div className="notice" role="status">{notice}</div>
 
