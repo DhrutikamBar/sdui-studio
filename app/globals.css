@@ -307,6 +307,9 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
 .screen-search input:focus { box-shadow: none; }
 .screen-link { padding: 8px 10px; }
 .screen-link > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.screen-link .screen-link-main { flex: 1 1 auto; }
+.screen-link-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-link .screen-link-states { flex: 0 0 auto; align-items: flex-end; flex-direction: column; gap: 3px; }
 .screen-link > span b { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 auto; border-radius: 6px; color: #bbc7de; background: rgba(255,255,255,.08); font-size: 9px; }
 .screen-link.active > span b { color: #fff; background: rgba(142, 132, 255, .52); }
 .sidebar-empty { padding: 9px 10px; margin: 0; color: #93a1bb; font-size: 11px; }
