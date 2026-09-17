@@ -22,17 +22,21 @@ test('an admin can add and remove an existing Studio member', async ({ page }, t
   const card = page.getByRole('region', { name: 'Project members' });
   await expect(card.locator('.project-member-row').filter({ hasText: 'e2e-admin@example.test' })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Current admin' })).toBeDisabled();
+  const designerRow = card.locator('.project-member-row').filter({ hasText: 'e2e-designer@example.test' });
+  if (await designerRow.count()) {
+    await designerRow.getByRole('button', { name: 'Remove from project' }).click();
+    await expect(designerRow).toHaveCount(0);
+  }
 
   await card.getByLabel('Studio member to add').selectOption('e2e-designer');
   await card.getByRole('button', { name: 'Add to project' }).click();
-  const designerRow = card.locator('.project-member-row').filter({ hasText: 'e2e-designer@example.test' });
   await expect(designerRow).toBeVisible();
   await expect(page.getByText('e2e-designer@example.test added to Phase 5 test project.')).toBeVisible();
-  await expect(page.locator('.audit-row').filter({ hasText: 'project member added' }).filter({ hasText: 'Phase 5 test project' })).toBeVisible();
+  await expect(page.locator('.audit-row').filter({ hasText: 'project member added' }).filter({ hasText: 'Phase 5 test project' }).first()).toBeVisible();
   await designerRow.getByRole('button', { name: 'Remove from project' }).click();
   await expect(designerRow).toHaveCount(0);
   await expect(page.getByText('e2e-designer@example.test removed from Phase 5 test project.')).toBeVisible();
-  await expect(page.locator('.audit-row').filter({ hasText: 'project member removed' }).filter({ hasText: 'Phase 5 test project' })).toBeVisible();
+  await expect(page.locator('.audit-row').filter({ hasText: 'project member removed' }).filter({ hasText: 'Phase 5 test project' }).first()).toBeVisible();
 });
 
 test('the server denies reviewer changes and admin self-removal', async ({ page, request }, testInfo) => {
