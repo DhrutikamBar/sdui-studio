@@ -68,9 +68,9 @@ test('draft, preview, publish, and archive work at each viewport', async ({ page
   await expect(libraryScreen).toContainText('Live v2');
 
   await page.getByRole('button', { name: 'Archive', exact: true }).click();
-  await expect(page.locator('.notice').first()).toContainText('Screen archived');
   if (width <= 860) await page.getByRole('button', { name: 'Open screen library' }).click();
   await page.getByRole('button', { name: 'Archived', exact: true }).click();
+  await expect(libraryScreen).toContainText('Archived');
   await libraryScreen.click();
   await expect(page.getByRole('button', { name: 'Restore screen' })).toBeVisible();
   await page.getByRole('button', { name: 'Restore screen' }).click();
