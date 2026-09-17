@@ -11,7 +11,7 @@ It also includes **FlexFlow UI Exporter**, a local Figma development plugin that
 - Approved data-binding picker and sample response panel
 - Mobile-shaped preview
 - Draft, publish, and rollback interactions
-- Local-first editing with optional shared Firestore drafts and versions
+- Shared Firestore drafts and published versions after sign-in
 - Selected-frame Figma export with conversion notes
 
 ## Figma exporter
@@ -44,11 +44,21 @@ In the Figma desktop app:
 
 ## Safety model
 
-Studio manages layouts and approved binding paths only. It does not store API credentials or permit arbitrary API endpoint calls. A production publish endpoint must validate schema, roles, capabilities, and action policies before writing a published screen document.
+FlexFlow UI manages layouts and approved binding paths only. It does not store API credentials or permit arbitrary API endpoint calls. The server validates the document, role, project membership, and release actions before saving a version. Web URL actions require an origin listed in `FLEXFLOW_ALLOWED_URL_ORIGINS`; direct API-call actions cannot be published.
+
+### Server setup for saving and publishing
+
+The Next.js server needs Firebase Admin credentials through Application Default Credentials. On a managed Google runtime, assign its service account the required Firestore and Authentication permissions. For local development, set `GOOGLE_APPLICATION_CREDENTIALS` to a service account JSON file outside this repository. Set `FIREBASE_ADMIN_PROJECT_ID` if the project ID is not supplied by the runtime. Never put a service account key in a `NEXT_PUBLIC_` variable or commit it.
+
+Set `FLEXFLOW_ALLOWED_URL_ORIGINS` to a comma-separated list of HTTPS origins if released documents may open web URLs, for example `https://example.com,https://help.example.com`. With no origins configured, URL actions cannot be published.
+
+Deploy the server code first, then deploy the updated `firestore.rules`. The rules block browser writes to screen metadata and version documents; drafts, publishing, archive, and restore now use the authenticated server endpoint. A server deployment is required for those actions to work.
+
+For existing screens, the first server save inspects older version documents to recover the highest saved and published numbers. New saves retain separate `latestDraftVersion` and `publishedVersion` pointers. Saving a draft leaves the published version live; publishing assigns the next number in a transaction with the screen record, immutable version, route reservation, and audit entry.
 
 ## Shared Firestore workspace
 
-Studio works locally until a user signs in with an administrator-created email/password account. The top bar then shows one of four clear states: local-only, saving, shared-and-saved, or shared-sync-failed.
+An administrator-created email/password account is required to open the editor. Saving a draft or publishing a version requires the configured Firebase Admin server endpoint. If Firebase is not configured, the sign-in page explains that setup is unavailable.
 
 The shared data structure is:
 
@@ -69,7 +79,7 @@ Available roles are:
 
 - `designer`: read, save drafts, and publish versions.
 - `reviewer`: read-only access.
-- `admin`: designer permissions plus user-role administration and delete/rollback support.
+- `admin`: designer permissions plus user-role administration.
 
 Deploy `firestore.rules` from the Firebase Console or Firebase CLI before enabling shared use. Do not replace it with public `allow read, write: if true` rules.
 

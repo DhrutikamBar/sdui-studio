@@ -84,24 +84,20 @@ service cloud.firestore {
       allow read: if canReadStudio();
       allow create: if canEditStudio()
         && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.action in ['access_updated', 'version_restored']
         && request.resource.data.createdAt is int;
       allow update, delete: if false;
     }
 
     match /sduiScreens/{screenId} {
       allow read: if canReadProject(projectId(resource.data));
-      allow create: if canEditProject(projectId(request.resource.data));
-      allow update: if projectId(request.resource.data) == projectId(resource.data)
-        && canEditProject(projectId(resource.data));
-      allow delete: if isAdmin() && canEditProject(projectId(resource.data));
+      // Screen metadata and version pointers are written by the authenticated server.
+      allow create, update, delete: if false;
 
       // Versions are append-only. An accidental edit cannot silently rewrite history.
       match /versions/{versionId} {
         allow read: if canReadProject(projectId(get(/databases/$(database)/documents/sduiScreens/$(screenId)).data));
-        allow create: if canEditProject(projectId(get(/databases/$(database)/documents/sduiScreens/$(screenId)).data));
-        allow update: if false;
-        allow delete: if isAdmin()
-          && canEditProject(projectId(get(/databases/$(database)/documents/sduiScreens/$(screenId)).data));
+        allow create, update, delete: if false;
       }
     }
   }
