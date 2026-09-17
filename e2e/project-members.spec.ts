@@ -11,7 +11,7 @@ async function signIn(page: Page, role: 'admin' | 'reviewer') {
 async function openProjectGovernance(page: Page) {
   await page.getByRole('button', { name: 'Open screen library' }).click();
   await page.getByLabel('Active client project').selectOption('phase5-project');
-  await page.getByRole('button', { name: 'Close screen library' }).click();
+  await expect(page.locator('.sidebar')).toBeHidden();
   await page.getByRole('button', { name: /Governance/ }).click();
   await expect(page.getByRole('heading', { name: 'Phase 5 test project members' })).toBeVisible();
 }
