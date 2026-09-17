@@ -12,6 +12,7 @@ const app = initializeApp({ projectId });
 const users = [
   { uid: 'e2e-admin', email: 'e2e-admin@example.test', password: 'local-e2e-admin-password', role: 'admin' },
   { uid: 'e2e-reviewer', email: 'e2e-reviewer@example.test', password: 'local-e2e-reviewer-password', role: 'reviewer' },
+  { uid: 'e2e-designer', email: 'e2e-designer@example.test', password: 'local-e2e-designer-password', role: 'designer' },
 ];
 
 for (const user of users) {
@@ -22,5 +23,15 @@ for (const user of users) {
     active: true,
   });
 }
+
+await getFirestore(app).collection('studioProjects').doc('phase5-project').set({
+  id: 'phase5-project',
+  name: 'Phase 5 test project',
+  packageName: 'com.example.phase5',
+  memberIds: ['e2e-admin', 'e2e-reviewer'],
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  updatedBy: 'Local test fixture',
+});
 
 console.log('Seeded local FlexFlow UI emulator accounts.');

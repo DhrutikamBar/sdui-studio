@@ -417,6 +417,7 @@ export default function StudioPage() {
   const screenLoadGeneration = useRef(0);
   const [screens, setScreens] = useState(initialScreens);
   const [projects, setProjects] = useState<StudioProject[]>([legacyProject]);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(legacyProject.id);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -525,10 +526,17 @@ export default function StudioPage() {
     if (!firebaseUser) return;
     return watchStudioProjects(firebaseUser.uid, (remoteProjects) => {
       setProjects([legacyProject, ...remoteProjects.filter((project) => project.id !== legacyProject.id)]);
+      setProjectsLoaded(true);
     }, (message) => {
       setNotice("Project list could not load: " + message);
     });
   }, [firebaseUser]);
+
+  useEffect(() => {
+    if (!projectsLoaded || selectedProjectId === legacyProject.id || projects.some((project) => project.id === selectedProjectId)) return;
+    chooseProject(legacyProject);
+    setNotice("Your access to that client project ended. The demo workspace is open.");
+  }, [projectsLoaded, projects, selectedProjectId]);
 
   useEffect(() => {
     if (!firebaseUser) return;
@@ -1261,7 +1269,7 @@ export default function StudioPage() {
         </div>
 
         </>}
-        {workspaceView === "governance" && <><div className="notice workspace-notice" role="status">Manage roles, access, and the immutable activity history for this workspace.</div><StudioGovernancePanel actor={firebaseUser} /></>}
+        {workspaceView === "governance" && <><div className="notice workspace-notice" role="status">Manage roles, project access, and the immutable activity history for this workspace.</div><StudioGovernancePanel actor={firebaseUser} project={selectedProject} /></>}
         {workspaceView === "preview" && <><div className="notice workspace-notice" role="status">Test the selected screen before publishing it. Preview data and failure states never change the live mobile screen.</div>
 
         <section className="preview-launcher">

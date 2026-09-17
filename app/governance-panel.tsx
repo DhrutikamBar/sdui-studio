@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { resetStudioPassword } from "../lib/firebase";
+import { changeStudioProjectMember, type StudioProject } from "../lib/studio-projects";
 import {
   loadStudioMember,
   observeStudioAudit,
@@ -20,7 +21,7 @@ type StudioActor = {
 
 const roles: StudioRole[] = ["designer", "reviewer", "admin"];
 
-export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) {
+export function StudioGovernancePanel({ actor, project }: { actor: StudioActor | null; project: StudioProject }) {
   const [profile, setProfile] = useState<StudioMember | null>(null);
   const [members, setMembers] = useState<StudioMember[]>([]);
   const [audit, setAudit] = useState<StudioAuditEntry[]>([]);
@@ -31,6 +32,10 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<StudioRole>("designer");
   const [active, setActive] = useState(true);
+  const [projectMemberUid, setProjectMemberUid] = useState("");
+  const [projectBusy, setProjectBusy] = useState(false);
+
+  useEffect(() => setProjectMemberUid(""), [project.id]);
 
   useEffect(() => {
     if (!actor) {
@@ -65,6 +70,26 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
 
   const isAdmin = profile?.role === "admin";
   const canManage = isAdmin && profile?.active !== false;
+  const projectMembers = project.memberIds.map((memberUid) => members.find((member) => member.uid === memberUid) ?? {
+    uid: memberUid, email: memberUid, displayName: "", role: "reviewer" as const, active: false, updatedAt: 0,
+  });
+  const availableProjectMembers = members.filter((member) => member.active && !project.memberIds.includes(member.uid));
+
+  async function changeProjectAccess(targetUid: string, action: "add" | "remove") {
+    if (!canManage || project.id === "legacy" || projectBusy) return;
+    setProjectBusy(true);
+    setError("");
+    try {
+      await changeStudioProjectMember({ projectId: project.id, targetUid, action });
+      const member = members.find((item) => item.uid === targetUid);
+      setNotice((member?.email ?? targetUid) + (action === "add" ? " added to " : " removed from ") + project.name + ".");
+      setProjectMemberUid("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not update project access.");
+    } finally {
+      setProjectBusy(false);
+    }
+  }
 
   async function saveAccessRecord() {
     if (!canManage) return;
@@ -157,12 +182,35 @@ export function StudioGovernancePanel({ actor }: { actor: StudioActor | null }) 
         </section>
       </div>}
 
+      <section className="governance-card project-members-card" aria-label="Project members">
+        <h3>{project.id === "legacy" ? "Demo workspace access" : project.name + " members"}</h3>
+        {project.id === "legacy" ? <p>The demo workspace uses Studio access. Choose a client project to manage its members.</p> : <>
+          <p>{project.memberIds.length} member{project.memberIds.length === 1 ? "" : "s"} can open this client project. Studio roles still determine who can edit or publish.</p>
+          {canManage ? <>
+            <div className="project-member-add">
+              <label>Studio member to add<select value={projectMemberUid} onChange={(event) => setProjectMemberUid(event.target.value)} disabled={projectBusy}>
+                <option value="">Choose a Studio member</option>
+                {availableProjectMembers.map((member) => <option key={member.uid} value={member.uid}>{member.displayName ? member.displayName + " · " : ""}{member.email} ({member.role})</option>)}
+              </select></label>
+              <button className="primary" type="button" disabled={!projectMemberUid || projectBusy} onClick={() => void changeProjectAccess(projectMemberUid, "add")}>Add to project</button>
+            </div>
+            {!availableProjectMembers.length && <p className="empty-state">All active Studio members already have access.</p>}
+            <div className="project-member-list">
+              {projectMembers.map((member) => <div className="project-member-row" key={member.uid}>
+                <div><strong>{member.displayName || member.email}</strong><small>{member.email !== member.uid ? member.email + " · " : ""}{member.active ? member.role : "Inactive or missing Studio record"}</small></div>
+                <button className="link-button" type="button" disabled={member.uid === currentActor.uid || projectBusy} onClick={() => void changeProjectAccess(member.uid, "remove")}>{member.uid === currentActor.uid ? "Current admin" : "Remove from project"}</button>
+              </div>)}
+            </div>
+          </> : <p>Only an active Studio admin who belongs to this project can change its members.</p>}
+        </>}
+      </section>
+
       <section className="governance-card audit-card">
         <h3>Recent activity</h3>
         <div className="audit-list">
           {audit.map((entry) => <div className="audit-row" key={entry.id}>
             <span className={"audit-dot " + entry.action} />
-            <div><strong>{entry.action.replaceAll("_", " ")}</strong><small>{entry.targetLabel || entry.screenId || "Studio workspace"} · {entry.actorLabel}</small></div>
+            <div><strong>{entry.action.replaceAll("_", " ")}</strong><small>{entry.targetLabel || entry.screenId || "Studio workspace"}{entry.projectName ? " · " + entry.projectName : ""} · {entry.actorLabel}</small></div>
             <time>{new Date(entry.createdAt).toLocaleString()}</time>
           </div>)}
           {!audit.length && <p className="empty-state">Activity appears here after the next draft save, publish, restore, archive, or access change.</p>}

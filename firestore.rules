@@ -71,10 +71,8 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.packageName is string
         && request.resource.data.memberIds is list;
-      allow update: if isAdmin()
-        && request.resource.data.name is string
-        && request.resource.data.packageName is string
-        && request.resource.data.memberIds is list;
+      // The authenticated server validates membership changes and writes the audit entry.
+      allow update: if false;
       allow delete: if false;
     }
 
