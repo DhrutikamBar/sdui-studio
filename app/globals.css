@@ -352,6 +352,18 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
 .governance-card { padding: 17px; border: 1px solid #e3e7f0; border-radius: 12px; background: rgba(255,255,255,.78); }
 .governance-card h3 { margin: 0 0 6px; font-size: 14px; }
 .governance-card > p { margin: 0 0 13px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.project-members-card { margin-top: 16px; }
+.project-member-add { display: flex; align-items: end; gap: 10px; margin: 12px 0 16px; }
+.project-member-add label { display: grid; flex: 1 1 auto; min-width: 0; gap: 5px; font-size: 11px; font-weight: 700; }
+.project-member-add select { width: 100%; min-height: 40px; padding: 8px; border: 1px solid #dbe0e9; border-radius: 8px; background: #fff; font: inherit; }
+.project-member-add button { flex: 0 0 auto; min-height: 40px; }
+.project-member-list { display: grid; }
+.project-member-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 10px 0; border-top: 1px solid #edf0f5; }
+.project-member-row > div { display: grid; min-width: 0; gap: 2px; }
+.project-member-row strong, .project-member-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-member-row strong { font-size: 12px; }
+.project-member-row small { color: var(--muted); font-size: 11px; }
+.project-member-row button { flex: 0 0 auto; }
 .governance-form { display: grid; gap: 10px; }
 .governance-form .primary { width: fit-content; }
 .member-list, .audit-list { display: grid; gap: 8px; }
@@ -381,6 +393,9 @@ pre { max-height: 215px; overflow: auto; padding: 10px; background: #111827; col
   .governance-heading { align-items: flex-start; flex-direction: column; }
   .member-row { grid-template-columns: 1fr 90px; }
   .member-active, .member-row .link-button { grid-column: 1 / -1; }
+  .project-member-add { align-items: stretch; flex-direction: column; }
+  .project-member-add button { width: 100%; }
+  .project-member-row { align-items: start; flex-direction: column; }
   .audit-row { grid-template-columns: 9px 1fr; }
   .audit-row time { grid-column: 2; }
 }

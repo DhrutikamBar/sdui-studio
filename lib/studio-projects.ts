@@ -1,5 +1,5 @@
 import { collection, onSnapshot, query, setDoc, doc, where } from "firebase/firestore";
-import { firestore } from "./firebase";
+import { firestore, studioIdToken } from "./firebase";
 
 export type StudioProject = {
   id: string;
@@ -67,4 +67,16 @@ export async function createStudioProject(input: { name: string; packageName: st
   };
   await setDoc(doc(db, "studioProjects", id), project);
   return project;
+}
+
+export async function changeStudioProjectMember(input: { projectId: string; targetUid: string; action: "add" | "remove" }) {
+  const token = await studioIdToken();
+  const response = await fetch("/api/projects/members", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const result = await response.json() as { memberIds?: string[]; error?: string };
+  if (!response.ok || !result.memberIds) throw new Error(result.error || "Project membership could not be updated.");
+  return result.memberIds;
 }

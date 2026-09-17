@@ -130,6 +130,8 @@ Studio supports multiple client projects without deploying a separate copy of St
 - Project screens are stored under project-scoped Firestore IDs; routes such as `home` and `wallet` can therefore exist independently for different clients.
 - Firestore rules permit only project members to read a project, and only designer/admin members to write it.
 
-Before enabling this in Firebase, deploy the current `firestore.rules`. Existing administrators can then create a client project. Add other users' Firebase Authentication UIDs to its `memberIds` field in Firestore until the member-management screen adds project membership controls.
+Admins can add and remove existing, active Studio members in the Governance view after selecting a client project. The server validates each change, keeps the acting admin in the project, and records an audit entry. Create Firebase Authentication accounts and Studio access records before adding them to a project.
+
+Deploy the updated server before publishing `firestore.rules`. The updated rules reserve project membership updates for the authenticated server endpoint; they do not allow direct browser edits to a project's `memberIds`.
 
 The mobile host must select the client project when it requests a remote screen (for example `projectId: "acme-banking-…"`). The current demo app deliberately continues to load the legacy project until that host integration is enabled.

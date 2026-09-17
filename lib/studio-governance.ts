@@ -20,6 +20,7 @@ export type StudioAuditEntry = {
   actorLabel: string;
   screenId?: string;
   targetLabel?: string;
+  projectName?: string;
   createdAt: number;
 };
 
