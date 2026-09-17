@@ -8,9 +8,10 @@ async function signIn(page: Page, role: 'admin' | 'reviewer') {
   await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
 }
 
-async function openProjectGovernance(page: Page, mobile: boolean) {
-  if (mobile) await page.getByRole('button', { name: 'Open screen library' }).click();
+async function openProjectGovernance(page: Page) {
+  await page.getByRole('button', { name: 'Open screen library' }).click();
   await page.getByLabel('Active client project').selectOption('phase5-project');
+  await expect(page.locator('.sidebar')).toBeHidden();
   await page.getByRole('button', { name: /Governance/ }).click();
   await expect(page.getByRole('heading', { name: 'Phase 5 test project members' })).toBeVisible();
 }
@@ -18,7 +19,7 @@ async function openProjectGovernance(page: Page, mobile: boolean) {
 test('an admin can add and remove an existing Studio member', async ({ page }, testInfo) => {
   test.skip(!['desktop', 'phone'].includes(testInfo.project.name), 'Check desktop and phone layouts.');
   await signIn(page, 'admin');
-  await openProjectGovernance(page, testInfo.project.name === 'phone');
+  await openProjectGovernance(page);
   const card = page.getByRole('region', { name: 'Project members' });
   await expect(card.locator('.project-member-row').filter({ hasText: 'e2e-admin@example.test' })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Current admin' })).toBeDisabled();
@@ -42,7 +43,7 @@ test('an admin can add and remove an existing Studio member', async ({ page }, t
 test('the server denies reviewer changes and admin self-removal', async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Role enforcement only needs one viewport.');
   await signIn(page, 'reviewer');
-  await openProjectGovernance(page, false);
+  await openProjectGovernance(page);
   await expect(page.getByText('Only an active Studio admin who belongs to this project can change its members.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add to project' })).toHaveCount(0);
 

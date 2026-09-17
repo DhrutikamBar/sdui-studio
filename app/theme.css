@@ -100,6 +100,83 @@ body {
 .theme-toggle:active { transform: translateY(0) scale(.97); }
 .theme-toggle-compact { min-height: 34px; padding: 5px 10px; }
 
+/* The library is a drawer at every width. Its edge tab stays reachable when shut. */
+.studio-shell { display: block; }
+.workspace { width: 100%; }
+.sidebar {
+  position: fixed !important;
+  z-index: 42;
+  inset: 0 auto 0 0;
+  width: min(306px, calc(100vw - 42px)) !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: none !important;
+  overflow-y: auto;
+  padding: 25px 16px !important;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-105%);
+  box-shadow: none;
+  transition: transform .3s cubic-bezier(.2,.8,.2,1), visibility .3s, box-shadow .3s ease;
+}
+.sidebar.mobile-open {
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+  box-shadow: 20px 0 55px rgba(6, 13, 34, .34);
+}
+.sidebar-edge-toggle {
+  position: fixed;
+  z-index: 40;
+  top: 43%;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 70px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+  color: var(--accent-ink);
+  background: var(--glass-strong);
+  box-shadow: 5px 6px 20px rgba(26, 37, 80, .16);
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  transition: width .22s ease, background .22s ease, box-shadow .22s ease;
+}
+.sidebar-edge-toggle span { font-size: 30px; line-height: 1; transform: translateX(-1px); }
+.sidebar-edge-toggle:hover { width: 42px; background: var(--control); box-shadow: 7px 8px 24px rgba(26, 37, 80, .20); }
+.mobile-drawer-close {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  z-index: 1;
+  top: 16px;
+  right: 13px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(255,255,255,.10);
+  font-size: 25px;
+  line-height: 1;
+  transition: background .2s ease, transform .2s ease;
+}
+.mobile-drawer-close:hover { background: rgba(255,255,255,.2); transform: rotate(90deg); }
+.mobile-drawer-backdrop { display: block; position: fixed; z-index: 41; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(10, 16, 34, .48); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+.sidebar .sidebar-brand { padding-right: 42px; }
+
+@media (max-width: 860px) {
+  .sidebar { width: min(306px, calc(100vw - 42px)) !important; padding: 20px 14px !important; }
+  .sidebar-edge-toggle { top: 38%; min-height: 58px; }
+}
+@media (max-width: 390px) {
+  .sidebar { width: min(292px, calc(100vw - 35px)) !important; }
+}
+
 /* Interactive surfaces */
 .secondary, .palette-grid button, .layout-actions button, .nest-button,
 .binding-list button, .clear-binding, .preview-state button, .scenario-picker button,
