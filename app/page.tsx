@@ -968,6 +968,7 @@ export default function StudioPage() {
   const selectedNode = parsed.document ? nodeAtPath(parsed.document, selectedPath) : null;
   const selectedProps = (selectedNode?.props ?? {}) as Record<string, unknown>;
   const selectedStyle = (selectedProps.style ?? {}) as Record<string, unknown>;
+  const usesWalletSampleData = /\{\{\s*(?:wallet|transactions)(?:[.}]|\s)/.test(json);
   const activeSampleData = sampleScenarios[sampleScenario].data;
   const activeScreens = screens.filter((screen) => showArchived || screen.status !== "Archived");
   const visibleScreens = activeScreens.filter((screen) => (screen.title + " " + screen.route).toLowerCase().includes(screenSearch.trim().toLowerCase()));
@@ -1127,7 +1128,11 @@ export default function StudioPage() {
         <nav aria-label="Screen library">
           {visibleScreens.map((screen) => (
             <button key={screen.id} aria-current={screen.id === selectedId ? "page" : undefined} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => { void chooseScreen(screen); setMobileMenuOpen(false); }}>
-              <span><b>{screen.title.slice(0, 1).toUpperCase()}</b>{screen.title}</span><em className={screen.status === "Published" ? "published" : screen.status === "Archived" ? "archived" : "draft"}>{screen.status}</em>
+              <span className="screen-link-main"><b>{screen.title.slice(0, 1).toUpperCase()}</b><span className="screen-link-name">{screen.title}</span></span>
+              <span className="screen-link-states">
+                {screen.status !== "Archived" && screen.latestDraftVersion && <em className="draft">Draft v{screen.latestDraftVersion}</em>}
+                {screen.status === "Published" ? <em className="published">Live v{screen.version}</em> : screen.status === "Archived" ? <em className="archived">Archived</em> : !screen.latestDraftVersion ? <em className="draft">Draft</em> : null}
+              </span>
             </button>
           ))}
           {!visibleScreens.length && <p className="sidebar-empty">No screens found</p>}
@@ -1155,7 +1160,7 @@ export default function StudioPage() {
           <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button></div>
         </header>
         <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
-        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{selectedScreen?.status === "Published" ? "Published v" + selectedScreen.version : selectedScreen?.status ?? "Draft"}</strong><small>{selectedScreen?.latestDraftVersion ? "Draft v" + selectedScreen.latestDraftVersion + " saved for review" : publishedCount + " published screen" + (publishedCount === 1 ? "" : "s") + " in this workspace"}</small></div></section>
+        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{selectedScreen?.latestDraftVersion ? "Draft v" + selectedScreen.latestDraftVersion : selectedScreen?.status === "Published" ? "Live v" + selectedScreen.version : selectedScreen?.status ?? "Draft"}</strong><small>{selectedScreen?.latestDraftVersion ? selectedScreen.version ? "Live v" + selectedScreen.version + " remains published" : "Not published yet" : publishedCount + " published screen" + (publishedCount === 1 ? "" : "s") + " in this workspace"}</small></div></section>
 
         <div className="notice" role="status">{notice}</div>
 
@@ -1237,7 +1242,7 @@ export default function StudioPage() {
 
             <section className="card">
               <button className="sample-toggle" aria-expanded={showSampleData} onClick={() => setShowSampleData((value) => !value)}>
-                <span><strong>Sample API response</strong><small>{sampleScenarios[sampleScenario].label}</small></span><span>{showSampleData ? "−" : "+"}</span>
+                <span><strong>Wallet sample API response</strong><small>{sampleScenarios[sampleScenario].label}</small></span><span>{showSampleData ? "−" : "+"}</span>
               </button>
               {showSampleData && <pre>{JSON.stringify(activeSampleData, null, 2)}</pre>}
             </section>
@@ -1268,7 +1273,7 @@ export default function StudioPage() {
           <section ref={previewDialogRef} className="floating-preview-dialog" role="dialog" aria-modal="true" aria-label="Mobile screen preview">
             <header className="floating-preview-header"><div><p className="eyebrow">LIVE PREVIEW</p><strong>{title}</strong><small>Drag the lower-right corner to resize on desktop.</small></div><button className="logout-button" onClick={() => setShowFloatingPreview(false)} aria-label="Close mobile preview">Close</button></header>
             <div className="floating-preview-body">
-              <div className="floating-preview-controls"><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} aria-pressed={sampleScenario === key} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} aria-pressed={previewState === key} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
+              <div className="floating-preview-controls">{usesWalletSampleData && <div className="scenario-picker" role="group" aria-label="Wallet sample data">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} aria-pressed={sampleScenario === key} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div>}<div className="preview-state" role="group" aria-label="Preview state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} aria-pressed={previewState === key} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
               <div className="floating-phone-wrap"><MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} /></div>
             </div>
           </section>
