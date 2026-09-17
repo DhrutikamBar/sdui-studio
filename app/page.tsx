@@ -264,7 +264,15 @@ const sampleScenarios: Record<string, { label: string; data: Record<string, unkn
 };
 
 function getValue(path: string, source: Record<string, unknown>): unknown {
-  return path.split(".").reduce<un unknown, scope: Record<string, unknown>): string {
+  return path.split(".").reduce<unknown>((value, segment) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return (value as Record<string, unknown>)[segment];
+    }
+    return undefined;
+  }, source);
+}
+
+function resolveText(value: unknown, scope: Record<string, unknown>): string {
   if (typeof value !== "string") return String(value ?? "");
   return value.replace(/\{\{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*\}\}/g, (_, path: string) => {
     const resolved = getValue(path, scope);
