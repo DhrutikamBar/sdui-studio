@@ -481,6 +481,7 @@ export default function StudioPage() {
       : mobileMenuOpen ? drawerRef.current : null;
     if (!active) return;
 
+    const wasDrawer = active === drawerRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -510,7 +511,7 @@ export default function StudioPage() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
-      if (previousFocus?.closest(".sidebar") && !drawerRef.current?.classList.contains("mobile-open")) mobileMenuButtonRef.current?.focus();
+      if (wasDrawer && !drawerRef.current?.classList.contains("mobile-open")) mobileMenuButtonRef.current?.focus();
       else previousFocus?.focus();
     };
   }, [mobileMenuOpen, showProjectDialog, showFloatingPreview, pendingRestore]);
