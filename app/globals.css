@@ -569,6 +569,31 @@ textarea { width: 100%; }
   .sidebar, .mobile-drawer-backdrop { animation: none !important; transition: none !important; }
 }
 
+/* Keep the main editing actions reachable on a phone. */
+.mobile-publish-bar { display: none; }
+:where(button, a, input, select, textarea):focus-visible { outline: 3px solid #4f46e5; outline-offset: 3px; }
+button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+@media (max-width: 860px) {
+  .sidebar:not(.mobile-open) { visibility: hidden; pointer-events: none; }
+  .sidebar.mobile-open { visibility: visible; }
+}
+
+@media (max-width: 620px) {
+  .workspace { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+  .top-actions button:nth-last-child(-n+2) { display: none; }
+  .mobile-publish-bar { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #dfe3ef; background: rgba(255,255,255,.97); box-shadow: 0 -8px 24px rgba(25, 34, 63, .1); }
+  .mobile-publish-bar button { min-width: 0; min-height: 44px; padding: 8px 10px; font-size: 12px; }
+  .floating-preview-controls { max-height: 34dvh; overflow-y: auto; }
+  .floating-preview-controls .scenario-picker, .floating-preview-controls .preview-state { display: flex; flex-wrap: nowrap; min-width: 0; overflow-x: auto; padding: 2px 0 6px; }
+  .floating-preview-controls .scenario-picker button, .floating-preview-controls .preview-state button { flex: 0 0 auto; }
+}
+
+@media (pointer: coarse) {
+  .screen-link, .palette-grid button, .workspace-view-tabs button, .scenario-picker button, .preview-state button, .mobile-drawer-close, .mobile-menu-toggle, .outline-node > button { min-height: 44px; }
+  .sidebar-label-row button, .link-button, .reset-link { min-height: 44px; }
+}
+
 
 /* Product-level Studio workspace experience */
 :root { --surface: #ffffff; --surface-soft: #f7f8ff; --surface-raised: rgba(255,255,255,.88); --accent: #635bff; --accent-soft: #efeeff; --navy: #10182d; }
@@ -641,4 +666,13 @@ body { background: radial-gradient(circle at 88% -5%, #e4e3ff 0, transparent 30r
   .project-dialog { width: 100%; padding: 23px 18px; border-radius: 17px 17px 0 0; }
   .project-dialog-backdrop { align-items: end; padding: 0; }
   .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; }
+}
+
+:is(button, a, input, select, textarea):focus-visible { outline: 3px solid #4f46e5; outline-offset: 3px; }
+.dialog-backdrop { z-index: 60; }
+@media (pointer: coarse) {
+  .mobile-menu-toggle, .mobile-drawer-close, .project-dialog .dialog-close { min-width: 44px; min-height: 44px; }
+}
+@media (max-width: 620px) {
+  .json-label textarea { min-height: 320px; }
 }

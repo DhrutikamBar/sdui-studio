@@ -466,6 +466,52 @@ export default function StudioPage() {
   const [screenStatusBusy, setScreenStatusBusy] = useState(false);
   const [versionSaveBusy, setVersionSaveBusy] = useState(false);
   const versionSaveInFlight = useRef(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const projectDialogRef = useRef<HTMLElement>(null);
+  const previewDialogRef = useRef<HTMLElement>(null);
+  const restoreDialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const active = pendingRestore ? restoreDialogRef.current
+      : showProjectDialog ? projectDialogRef.current
+      : showFloatingPreview ? previewDialogRef.current
+      : mobileMenuOpen ? drawerRef.current : null;
+    if (!active) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () => Array.from(active.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((element) => element.getClientRects().length > 0);
+    focusable()[0]?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (pendingRestore) setPendingRestore(null);
+        else if (showProjectDialog) setShowProjectDialog(false);
+        else if (showFloatingPreview) setShowFloatingPreview(false);
+        else setMobileMenuOpen(false);
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      if (!elements.length) return;
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (!active?.contains(document.activeElement)) { event.preventDefault(); first.focus(); return; }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.closest(".sidebar") && !drawerRef.current?.classList.contains("mobile-open")) mobileMenuButtonRef.current?.focus();
+      else previousFocus?.focus();
+    };
+  }, [mobileMenuOpen, showProjectDialog, showFloatingPreview, pendingRestore]);
 
   useEffect(() => observeStudioUser((user) => {
     screenLoadGeneration.current += 1;
@@ -667,6 +713,8 @@ export default function StudioPage() {
 
   function createScreen() {
     screenLoadGeneration.current += 1;
+    setMobileMenuOpen(false);
+    setWorkspaceView("build");
     const name = "New screen";
     const id = "screen-" + Date.now();
     const newRoute = uniqueRoute("new-screen", screens);
@@ -1067,18 +1115,18 @@ export default function StudioPage() {
 
   return (
     <main className="studio-shell">
-      <aside className={"sidebar " + (mobileMenuOpen ? "mobile-open" : "")}>
+      <aside ref={drawerRef} id="screen-library-drawer" aria-label="Screen library" className={"sidebar " + (mobileMenuOpen ? "mobile-open" : "")}>
         <button className="mobile-drawer-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close screen library">×</button>
         <div className="sidebar-brand"><span>◆</span><div><strong>FlexFlow UI</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
         <div className="workspace-switcher"><span>CLIENT PROJECT</span><select value={selectedProjectId} onChange={(event) => chooseProject(projects.find((project) => project.id === event.target.value) ?? legacyProject)} aria-label="Active client project">{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><small>{selectedProject.packageName}</small></div>
-        <button className="project-create-button" onClick={() => { setProjectError(""); setShowProjectDialog(true); }}>＋ New client project</button>
+        <button className="project-create-button" onClick={() => { setMobileMenuOpen(false); setProjectError(""); setShowProjectDialog(true); }}>＋ New client project</button>
         <button className="new-screen" onClick={createScreen}><b>＋</b> New screen <kbd>N</kbd></button>
         <div className="sidebar-summary"><div><strong>{activeScreens.length}</strong><span>screens</span></div><div><strong>{publishedCount}</strong><span>live</span></div><div><strong>{syncState === "saved" ? "●" : "○"}</strong><span>sync</span></div></div>
         <div className="sidebar-label-row"><p className="sidebar-label">SCREEN LIBRARY</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Archived"}</button></div>
-        <label className="screen-search"><span>⌕</span><input value={screenSearch} onChange={(event) => setScreenSearch(event.target.value)} placeholder="Find a screen" /></label>
+        <label className="screen-search"><span>⌕</span><input aria-label="Find a screen" value={screenSearch} onChange={(event) => setScreenSearch(event.target.value)} placeholder="Find a screen" /></label>
         <nav aria-label="Screen library">
           {visibleScreens.map((screen) => (
-            <button key={screen.id} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => { void chooseScreen(screen); setMobileMenuOpen(false); }}>
+            <button key={screen.id} aria-current={screen.id === selectedId ? "page" : undefined} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => { void chooseScreen(screen); setMobileMenuOpen(false); }}>
               <span><b>{screen.title.slice(0, 1).toUpperCase()}</b>{screen.title}</span><em className={screen.status === "Published" ? "published" : screen.status === "Archived" ? "archived" : "draft"}>{screen.status}</em>
             </button>
           ))}
@@ -1091,10 +1139,10 @@ export default function StudioPage() {
 
       <section className="workspace">
         <header className="app-topbar">
-          <div className="app-brand"><button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
+          <div className="app-brand"><button ref={mobileMenuButtonRef} className="mobile-menu-toggle" aria-controls="screen-library-drawer" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
           <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
-        {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}
+        {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section ref={projectDialogRef} className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}
         <nav className="workspace-view-tabs" aria-label="Studio workspace sections">
           <button className={workspaceView === "build" ? "active" : ""} aria-current={workspaceView === "build" ? "page" : undefined} onClick={() => setWorkspaceView("build")}><span>◫</span><div><strong>Build</strong><small>Screen editor</small></div></button>
           <button className={workspaceView === "preview" ? "active" : ""} aria-current={workspaceView === "preview" ? "page" : undefined} onClick={() => setWorkspaceView("preview")}><span>▣</span><div><strong>Preview</strong><small>Test states</small></div></button>
@@ -1104,8 +1152,9 @@ export default function StudioPage() {
         {workspaceView === "build" && <>
         <header className="topbar">
           <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">{screenVersionLabel} · Updated {selectedScreen?.updatedAt ?? "now"}</small></div>
-          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" disabled={versionSaveBusy} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy} onClick={publish}>Publish version</button></div>
+          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button></div>
         </header>
+        <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
         <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{selectedScreen?.status === "Published" ? "Published v" + selectedScreen.version : selectedScreen?.status ?? "Draft"}</strong><small>{selectedScreen?.latestDraftVersion ? "Draft v" + selectedScreen.latestDraftVersion + " saved for review" : publishedCount + " published screen" + (publishedCount === 1 ? "" : "s") + " in this workspace"}</small></div></section>
 
         <div className="notice" role="status">{notice}</div>
@@ -1187,14 +1236,14 @@ export default function StudioPage() {
             </section>
 
             <section className="card">
-              <button className="sample-toggle" onClick={() => setShowSampleData((value) => !value)}>
+              <button className="sample-toggle" aria-expanded={showSampleData} onClick={() => setShowSampleData((value) => !value)}>
                 <span><strong>Sample API response</strong><small>{sampleScenarios[sampleScenario].label}</small></span><span>{showSampleData ? "−" : "+"}</span>
               </button>
               {showSampleData && <pre>{JSON.stringify(activeSampleData, null, 2)}</pre>}
             </section>
 
             <section className="card versions">
-              <div className="panel-heading compact"><div><h2>Release workflow</h2><p>Publish only after validation and preview review.</p></div><button className="link-button" onClick={() => setShowCompare((value) => !value)}>Compare</button></div>
+              <div className="panel-heading compact"><div><h2>Release workflow</h2><p>Publish only after validation and preview review.</p></div><button className="link-button" aria-expanded={showCompare} onClick={() => setShowCompare((value) => !value)}>Compare</button></div>
               <label>Release note<input value={publishNote} placeholder="What changed in this version?" onChange={(event) => setPublishNote(event.target.value)} /></label>
               <label className="check-label"><input type="checkbox" checked={previewConfirmed} onChange={(event) => setPreviewConfirmed(event.target.checked)} /> I tested content, loading, empty, and error previews</label>
               <p className={parsed.error ? "workflow-error" : "workflow-ok"}>{parsed.error ? "JSON, bindings, or actions need attention." : "Document validation passed."}</p>
@@ -1216,15 +1265,15 @@ export default function StudioPage() {
         </section>
         </>}
         {showFloatingPreview && <div className="floating-preview-backdrop" role="presentation">
-          <section className="floating-preview-dialog" role="dialog" aria-modal="true" aria-label="Mobile screen preview">
+          <section ref={previewDialogRef} className="floating-preview-dialog" role="dialog" aria-modal="true" aria-label="Mobile screen preview">
             <header className="floating-preview-header"><div><p className="eyebrow">LIVE PREVIEW</p><strong>{title}</strong><small>Drag the lower-right corner to resize on desktop.</small></div><button className="logout-button" onClick={() => setShowFloatingPreview(false)} aria-label="Close mobile preview">Close</button></header>
             <div className="floating-preview-body">
-              <div className="floating-preview-controls"><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
+              <div className="floating-preview-controls"><div className="scenario-picker">{Object.entries(sampleScenarios).map(([key, scenario]) => <button key={key} className={sampleScenario === key ? "selected" : ""} aria-pressed={sampleScenario === key} onClick={() => setSampleScenario(key)}>{scenario.label}</button>)}</div><div className="preview-state">{[["content", "Content"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["retry", "Retry"]].map(([key, label]) => <button key={key} className={previewState === key ? "state-active" : ""} aria-pressed={previewState === key} onClick={() => setPreviewState(key)}>{label}</button>)}</div></div>
               <div className="floating-phone-wrap"><MobilePreview document={parsed.document} data={activeSampleData} state={previewState} onRetry={() => setPreviewState("content")} /></div>
             </div>
           </section>
         </div>}
-        {pendingRestore && <div className="dialog-backdrop"><section className="confirm-dialog"><h2>Restore version v{pendingRestore.number}?</h2><p>This replaces the document currently in the editor. It will remain a draft until you save and publish again.</p><div><button className="secondary" onClick={() => setPendingRestore(null)}>Cancel</button><button className="primary" onClick={confirmRestoreVersion}>Restore into draft</button></div></section></div>}
+        {pendingRestore && <div className="dialog-backdrop"><section ref={restoreDialogRef} className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="restore-version-title"><h2 id="restore-version-title">Restore version v{pendingRestore.number}?</h2><p>This replaces the document currently in the editor. It will remain a draft until you save and publish again.</p><div><button className="secondary" onClick={() => setPendingRestore(null)}>Cancel</button><button className="primary" onClick={confirmRestoreVersion}>Restore into draft</button></div></section></div>}
       </section>
     </main>
   );
