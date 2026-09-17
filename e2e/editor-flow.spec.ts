@@ -24,6 +24,24 @@ async function newScreen(page: Page, width: number) {
   await expect(page.getByRole('heading', { name: 'New screen' })).toBeVisible();
 }
 
+test('theme follows the system, persists a choice, and spans sign-in and editor', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Theme behavior only needs one browser viewport.');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByRole('button', { name: 'Switch to light mode' })).toBeVisible();
+  await page.getByRole('button', { name: 'Switch to light mode' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await signIn(page);
+  await expect(page.getByRole('button', { name: 'Switch to dark mode' })).toBeVisible();
+  await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
 test('draft, preview, publish, and archive work at each viewport', async ({ page }, testInfo) => {
   const width = testInfo.project.use.viewport?.width ?? 1440;
   await signIn(page);
