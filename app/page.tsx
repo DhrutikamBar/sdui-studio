@@ -1125,6 +1125,7 @@ export default function StudioPage() {
 
   return (
     <main className="studio-shell">
+      {!mobileMenuOpen && <button ref={mobileMenuButtonRef} className="sidebar-edge-toggle" aria-controls="screen-library-drawer" aria-label="Open screen library" aria-expanded="false" title="Open screen library" onClick={() => setMobileMenuOpen(true)}><span aria-hidden="true">›</span></button>}
       <aside ref={drawerRef} id="screen-library-drawer" aria-label="Screen library" className={"sidebar " + (mobileMenuOpen ? "mobile-open" : "")}>
         <button className="mobile-drawer-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close screen library">×</button>
         <div className="sidebar-brand"><span>◆</span><div><strong>FlexFlow UI</strong><small>Experience control room</small></div><i title="Shared workspace online" /></div>
@@ -1153,7 +1154,7 @@ export default function StudioPage() {
 
       <section className="workspace">
         <header className="app-topbar">
-          <div className="app-brand"><button ref={mobileMenuButtonRef} className="mobile-menu-toggle" aria-controls="screen-library-drawer" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
+          <div className="app-brand"><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
           <div className="app-user"><ThemeToggle compact /><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
         {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section ref={projectDialogRef} className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}

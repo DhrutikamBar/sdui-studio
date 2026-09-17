@@ -9,18 +9,20 @@ async function signIn(page: Page, role: 'admin' | 'reviewer' = 'admin') {
   await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
 }
 
-async function newScreen(page: Page, width: number) {
-  if (width <= 860) {
-    const menu = page.getByRole('button', { name: 'Open screen library' });
-    await menu.click();
-    await expect(page.locator('.sidebar')).toHaveClass(/mobile-open/);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/);
-    await expect(menu).toBeFocused();
-    await menu.click();
-  }
+async function newScreen(page: Page) {
+  const menu = page.getByRole('button', { name: 'Open screen library' });
+  await expect(menu).toBeVisible();
+  await expect(page.locator('.sidebar')).toBeHidden();
+  await menu.click();
+  await expect(page.locator('.sidebar')).toHaveClass(/mobile-open/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sidebar')).toBeHidden();
+  await expect(menu).toBeFocused();
+  await menu.click();
+  await expect(page.locator('.sidebar')).toBeVisible();
   await page.getByRole('button', { name: /New screen/ }).click();
-  if (width <= 860) await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/);
+  await expect(page.locator('.sidebar')).toBeHidden();
+  await expect(menu).toBeVisible();
   await expect(page.getByRole('heading', { name: 'New screen' })).toBeVisible();
 }
 
@@ -45,7 +47,7 @@ test('theme follows the system, persists a choice, and spans sign-in and editor'
 test('draft, preview, publish, and archive work at each viewport', async ({ page }, testInfo) => {
   const width = testInfo.project.use.viewport?.width ?? 1440;
   await signIn(page);
-  await newScreen(page, width);
+  await newScreen(page);
 
   if (width <= 620) await expect(page.locator('.mobile-publish-bar')).toBeVisible();
   else await expect(page.locator('.mobile-publish-bar')).toBeHidden();
@@ -102,7 +104,7 @@ test('draft, preview, publish, and archive work at each viewport', async ({ page
 test('reviewers cannot save screen versions', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Role enforcement only needs one viewport.');
   await signIn(page, 'reviewer');
-  await newScreen(page, 1440);
+  await newScreen(page);
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.locator('.notice').first()).toContainText('Your account cannot save screen versions.');
 });
