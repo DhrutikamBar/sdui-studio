@@ -1,0 +1,205 @@
+/* The Studio chrome uses one palette; the phone preview keeps document colors. */
+:root {
+  color-scheme: light;
+  --ink: #17233e;
+  --muted: #65718a;
+  --line: rgba(104, 120, 165, .20);
+  --paper: rgba(255, 255, 255, .66);
+  --canvas: #edf2fa;
+  --brand: #6459e8;
+  --brand-dark: #4d42ce;
+  --success: #137b52;
+  --shadow: 0 22px 60px rgba(42, 58, 104, .10), inset 0 1px rgba(255, 255, 255, .68);
+  --glass: rgba(255, 255, 255, .62);
+  --glass-strong: rgba(255, 255, 255, .78);
+  --glass-border: rgba(255, 255, 255, .74);
+  --control: rgba(255, 255, 255, .76);
+  --subtle: rgba(235, 239, 255, .75);
+  --accent-ink: #473abb;
+  --field-border: rgba(120, 136, 179, .28);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #edf3ff;
+  --muted: #aab9d3;
+  --line: rgba(174, 193, 240, .18);
+  --paper: rgba(22, 32, 57, .64);
+  --canvas: #0d1528;
+  --brand: #a69dff;
+  --brand-dark: #8076eb;
+  --success: #62daa0;
+  --warning: #f4bd6a;
+  --shadow: 0 24px 64px rgba(0, 4, 17, .36), inset 0 1px rgba(255, 255, 255, .07);
+  --glass: rgba(23, 33, 59, .65);
+  --glass-strong: rgba(27, 38, 66, .82);
+  --glass-border: rgba(173, 193, 240, .16);
+  --control: rgba(36, 49, 80, .82);
+  --subtle: rgba(51, 61, 104, .52);
+  --accent-ink: #c4beff;
+  --field-border: rgba(164, 183, 225, .28);
+}
+
+html { background: var(--canvas); }
+body {
+  min-height: 100vh;
+  color: var(--ink);
+  background: radial-gradient(circle at 10% 3%, rgba(113, 106, 242, .20), transparent 31rem), radial-gradient(circle at 90% 37%, rgba(38, 187, 198, .14), transparent 29rem), linear-gradient(145deg, #f5f7fc, #eaf0fa 62%, #f7f7ff);
+  background-attachment: fixed;
+  transition: background-color .4s ease, color .3s ease;
+}
+:root[data-theme="dark"] body {
+  background: radial-gradient(circle at 8% -10%, rgba(105, 90, 226, .28), transparent 32rem), radial-gradient(circle at 90% 42%, rgba(37, 155, 166, .16), transparent 34rem), linear-gradient(145deg, #0b1223, #111b31 60%, #0c1528);
+  background-attachment: fixed;
+}
+
+/* Glass reads as a material through translucency, blur and a fine highlight. */
+.sidebar, .auth-card, .editor-panel, .card, .governance-section, .governance-card,
+.workspace-insights > div, .preview-launcher, .preview-section, .floating-preview-dialog,
+.project-dialog, .confirm-dialog, .workspace-view-tabs, .top-actions, .notice,
+.import-bar, .importer, .import-review, .compare-panel, .property-group {
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+}
+.editor-panel, .card, .governance-section, .governance-card, .workspace-insights > div,
+.floating-preview-dialog, .project-dialog, .confirm-dialog, .auth-card { background: var(--glass); }
+.workspace-view-tabs, .top-actions, .preview-launcher, .preview-section,
+.import-bar, .importer, .import-review, .compare-panel, .property-group { background: var(--subtle); }
+.app-topbar, .floating-preview-header, .mobile-publish-bar {
+  border-color: var(--line);
+  background: var(--glass-strong);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+}
+.sidebar {
+  border-right: 1px solid rgba(207, 207, 255, .16);
+  background: radial-gradient(circle at 4% 0, rgba(155, 145, 255, .28), transparent 22rem), linear-gradient(160deg, rgba(16, 25, 48, .88), rgba(31, 34, 84, .82));
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+}
+.sidebar-summary > div, .workspace-switcher, .screen-search, .sidebar-tools > div,
+.project-create-button { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.auth-page { background: transparent; }
+.auth-showcase {
+  background: radial-gradient(circle at 85% 16%, rgba(159, 147, 255, .60), transparent 30%), radial-gradient(circle at 15% 88%, rgba(42, 197, 188, .27), transparent 32%), linear-gradient(145deg, rgba(17, 29, 60, .88), rgba(48, 38, 122, .82));
+}
+.auth-card { position: relative; }
+.auth-theme-control { display: flex; justify-content: flex-end; margin: -8px -8px 0 0; }
+.theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 38px; padding: 7px 12px; border: 1px solid var(--field-border);
+  border-radius: 999px; color: var(--ink); background: var(--glass-strong);
+  box-shadow: inset 0 1px rgba(255,255,255,.15), 0 5px 16px rgba(19,29,63,.07);
+  font-size: 12px; font-weight: 750; white-space: nowrap;
+  transition: transform .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+.theme-toggle > span:first-child { font-size: 18px; line-height: 1; }
+.theme-toggle:hover { transform: translateY(-2px); border-color: var(--brand); box-shadow: 0 9px 22px rgba(66, 56, 150, .15); }
+.theme-toggle:active { transform: translateY(0) scale(.97); }
+.theme-toggle-compact { min-height: 34px; padding: 5px 10px; }
+
+/* Interactive surfaces */
+.secondary, .palette-grid button, .layout-actions button, .nest-button,
+.binding-list button, .clear-binding, .preview-state button, .scenario-picker button,
+.profile-chip, .sync-state, .mobile-menu-toggle, .project-dialog .dialog-close,
+.review-warnings, .floating-preview-controls { color: var(--ink); border-color: var(--field-border); background: var(--control); }
+.workspace-view-tabs button, .outline-node > button, .logout-button { color: var(--muted); }
+.workspace-view-tabs button:hover, .palette-grid button:hover, .layout-actions button:hover,
+.nest-button:hover, .binding-list button:hover, .outline-node > button:hover {
+  color: var(--accent-ink); background: var(--subtle); border-color: var(--brand);
+}
+.workspace-view-tabs button.active, .outline-node > .outline-selected {
+  color: var(--accent-ink); background: var(--glass-strong); box-shadow: 0 7px 20px rgba(35, 32, 100, .11);
+}
+.workspace-view-tabs button > span, .nesting-target, .role-pill { color: var(--accent-ink); background: var(--subtle); }
+.primary, .new-screen { background: linear-gradient(135deg, #766bf0, #5548d0); box-shadow: 0 8px 22px rgba(85, 72, 208, .25); }
+.primary:hover, .new-screen:hover { background: linear-gradient(135deg, #857bf8, #6255df); }
+.notice { color: var(--accent-ink); background: var(--subtle); border-color: var(--field-border); }
+.firebase-state { color: var(--accent-ink); background: var(--subtle); border-color: var(--field-border); }
+.valid, .review-badge, .workflow-ok, .governance-notice, .sync-state.saved { color: #136945; background: rgba(83, 209, 145, .16); border-color: rgba(83, 209, 145, .24); }
+.invalid, .workflow-error, .governance-error, .project-error { color: #a3363a; background: rgba(238, 100, 108, .14); }
+.published { color: #9bf0bd; background: rgba(36, 118, 76, .48); }
+.draft { color: #ffdc8c; background: rgba(116, 83, 24, .48); }
+.archived { color: #c8d2e5; background: rgba(76, 87, 110, .48); }
+.preview-state .state-active, .scenario-picker .selected { color: #fff; background: #6254da; border-color: #6254da; }
+
+label, .outline, .versions > .version-row span, .import-bar strong,
+.import-review > div:first-child strong, .audit-row strong, .workspace-insights strong,
+.review-warnings strong { color: var(--ink); }
+.panel-heading p, .preview-launcher p:not(.eyebrow), .preview-copy > p:not(.eyebrow),
+.governance-heading p:not(.eyebrow), .confirm-dialog p, .project-dialog > p:not(.eyebrow),
+.auth-card-heading > p:not(.eyebrow), .auth-help, .workspace-insights small,
+.workspace-insights span, .floating-preview-header small, .versions .version-row small,
+.binding-list span, .binding-list small, .palette-grid span, .screen-context,
+.import-review p, .review-warnings p, .review-warnings ul { color: var(--muted); }
+.link-button, .reset-link, .property-editor code, .binding-list strong,
+.nest-button, .sidebar-label-row button { color: var(--accent-ink); }
+.outline-node, .outline, .versions > .version-row, .member-row, .audit-row,
+.project-member-row, .sidebar-footer, .floating-preview-header, .floating-preview-controls { border-color: var(--line); }
+.preview-launcher, .preview-section { color: var(--ink); }
+.floating-phone-wrap { background: radial-gradient(circle at 50% 0%, rgba(118, 108, 229, .20), transparent 55%), var(--subtle); }
+
+input:not([type="checkbox"]), select, .project-dialog input, .member-row select,
+.project-member-add select { color: var(--ink); border-color: var(--field-border); background: var(--control); }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(121, 110, 239, .20); }
+textarea:not(.preview-input textarea), pre { background: #111a2c; color: #e8efff; border-color: #354566; }
+.phone-shell .preview-input input { color: #17233e; border: 0; background: #fff; }
+select option { color: var(--ink); background: var(--canvas); }
+.sidebar select option { color: #17233e; background: #fff; }
+
+/* Dark mode covers nested panels and status text with explicit contrast. */
+:root[data-theme="dark"] .auth-card, :root[data-theme="dark"] .project-dialog,
+:root[data-theme="dark"] .confirm-dialog { color: var(--ink); }
+:root[data-theme="dark"] .auth-loading, :root[data-theme="dark"] .auth-card h2,
+:root[data-theme="dark"] .project-dialog h2 { color: var(--ink); }
+:root[data-theme="dark"] .auth-card-heading > p:not(.eyebrow),
+:root[data-theme="dark"] .auth-help, :root[data-theme="dark"] .project-dialog label,
+:root[data-theme="dark"] .project-dialog > p:not(.eyebrow) { color: var(--muted); }
+:root[data-theme="dark"] .auth-page { background: transparent; }
+:root[data-theme="dark"] .app-brand em { color: var(--muted); border-color: var(--line); }
+:root[data-theme="dark"] .profile-chip small, :root[data-theme="dark"] .sync-state small,
+:root[data-theme="dark"] .floating-preview-header small { color: var(--muted); }
+:root[data-theme="dark"] .sync-state.saved { color: #8ce6b4; }
+:root[data-theme="dark"] .valid, :root[data-theme="dark"] .review-badge,
+:root[data-theme="dark"] .workflow-ok, :root[data-theme="dark"] .governance-notice { color: #8ce6b4; }
+:root[data-theme="dark"] .invalid, :root[data-theme="dark"] .workflow-error,
+:root[data-theme="dark"] .governance-error, :root[data-theme="dark"] .project-error,
+:root[data-theme="dark"] .error-message { color: #ffaaa9; }
+:root[data-theme="dark"] .role-pill.admin { color: #d4b5ff; background: rgba(139, 93, 215, .22); }
+:root[data-theme="dark"] .role-pill.reviewer { color: #c5d1e6; background: rgba(137, 158, 196, .20); }
+:root[data-theme="dark"] .workspace-insights .metric-success { color: #84e3b0; }
+:root[data-theme="dark"] .workspace-insights .metric-warning { color: #ffc179; }
+:root[data-theme="dark"] .audit-row strong { color: var(--ink); }
+:root[data-theme="dark"] .screen-search input { color: #edf3ff; background: transparent; }
+:root[data-theme="dark"] .logout-button:hover { color: #ffaaa9; background: rgba(237, 99, 106, .15); }
+:root[data-theme="dark"] .mobile-menu-toggle span { background: var(--accent-ink); }
+:root[data-theme="dark"] .preview-state button:not(.state-active),
+:root[data-theme="dark"] .scenario-picker button:not(.selected) { color: var(--ink); }
+
+/* Small, purposeful movement gives feedback without moving the editing layout. */
+.auth-card, .workspace-insights, .studio-grid, .preview-launcher, .governance-section,
+.floating-preview-dialog, .project-dialog, .confirm-dialog { animation: glass-arrive .45s cubic-bezier(.2,.8,.2,1) both; }
+.workspace-insights > div, .card, .palette-grid button, .screen-link,
+.secondary, .primary, .theme-toggle { transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease, background-color .22s ease, color .22s ease; }
+.workspace-insights > div:hover, .card:hover { transform: translateY(-2px); box-shadow: 0 22px 52px rgba(29, 39, 80, .13); }
+.palette-grid button:hover { transform: translateY(-2px); }
+.screen-link:hover { transform: translateX(2px); }
+.primary:active, .secondary:active, .palette-grid button:active { transform: translateY(0) scale(.985); }
+.floating-preview-backdrop, .dialog-backdrop { animation: glass-fade .2s ease both; }
+@keyframes glass-arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 760px) {
+  .app-user { flex-wrap: wrap; }
+  .theme-toggle-compact { margin-right: auto; }
+}
+@media (max-width: 390px) {
+  .theme-toggle-compact { padding: 5px 8px; }
+  .theme-toggle-compact > span:last-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

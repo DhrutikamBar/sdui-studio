@@ -7,6 +7,7 @@ import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToS
 import { loadRemoteVersions, saveRemoteScreenStatus, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
 import { writeStudioAudit } from "../lib/studio-governance";
 import { StudioGovernancePanel } from "./governance-panel";
+import { ThemeToggle } from "./theme-toggle";
 import { createStudioProject, legacyProject, watchStudioProjects, type StudioProject } from "../lib/studio-projects";
 
 type JsonObject = {
@@ -263,15 +264,7 @@ const sampleScenarios: Record<string, { label: string; data: Record<string, unkn
 };
 
 function getValue(path: string, source: Record<string, unknown>): unknown {
-  return path.split(".").reduce<unknown>((value, segment) => {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      return (value as Record<string, unknown>)[segment];
-    }
-    return undefined;
-  }, source);
-}
-
-function resolveText(value: unknown, scope: Record<string, unknown>): string {
+  return path.split(".").reduce<un unknown, scope: Record<string, unknown>): string {
   if (typeof value !== "string") return String(value ?? "");
   return value.replace(/\{\{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*\}\}/g, (_, path: string) => {
     const resolved = getValue(path, scope);
@@ -1117,7 +1110,7 @@ export default function StudioPage() {
   }
 
   if (!firebaseUser) {
-    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>FlexFlow UI</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for FlexFlow UI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>Forgot password?</button><button className="primary auth-submit" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
+    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>FlexFlow UI</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for FlexFlow UI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-theme-control"><ThemeToggle /></div><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>Forgot password?</button><button className="primary auth-submit" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
   }
 
   const profileInitial = (firebaseUser.displayName ?? firebaseUser.email ?? "S").trim().charAt(0).toUpperCase();
@@ -1153,7 +1146,7 @@ export default function StudioPage() {
       <section className="workspace">
         <header className="app-topbar">
           <div className="app-brand"><button ref={mobileMenuButtonRef} className="mobile-menu-toggle" aria-controls="screen-library-drawer" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Open screen library" aria-expanded={mobileMenuOpen}><span /><span /><span /></button><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
-          <div className="app-user"><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
+          <div className="app-user"><ThemeToggle compact /><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
         </header>
         {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section ref={projectDialogRef} className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}
         <nav className="workspace-view-tabs" aria-label="Studio workspace sections">
