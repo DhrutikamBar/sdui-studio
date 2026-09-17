@@ -119,6 +119,8 @@ npm run test:e2e
 
 GitHub CI runs the same checks on every pull request and `main` push. Failed runs upload a Playwright report and trace for diagnosis.
 
+Phase 6 adds Firefox and WebKit browser engines. After a `main` push, CI also waits for the Firebase App Hosting rollout check on that exact commit and confirms the live URL responds. Follow [the release checklist](docs/release-checklist.md) to compare the current App Hosting rollout commit and complete the real-device pass.
+
 
 
 ## Client projects (multi-tenant workspaces)

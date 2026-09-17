@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 jobs:
   build:
@@ -36,7 +37,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -46,3 +47,20 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  live-rollout:
+    if: github.event_name == 'push'
+    needs: [build, browser-flow]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify App Hosting rollout and live response
+        run: node scripts/verify-live-rollout.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_HOSTING_CHECK_NAME: App Hosting - Rollout (sdui-cmp/us-east4/sdui-studio)
+          FLEXFLOW_LIVE_URL: https://sdui-studio--sdui-cmp.us-east4.hosted.app/
