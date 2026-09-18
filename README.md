@@ -56,6 +56,8 @@ Deploy the server code first, then deploy the updated `firestore.rules`. The rul
 
 For existing screens, the first server save inspects older version documents to recover the highest saved and published numbers. New saves retain separate `latestDraftVersion` and `publishedVersion` pointers. Saving a draft leaves the published version live; publishing assigns the next number in a transaction with the screen record, immutable version, route reservation, and audit entry.
 
+The Android reference app reads `GET /api/published-screens/{route}`. This public endpoint serves only an active published version from the legacy project. Draft and archived screens return 404. It uses Firebase Admin on the server; mobile clients do not need Studio membership or direct Firestore access.
+
 ## Shared Firestore workspace
 
 An administrator-created email/password account is required to open the editor. Saving a draft or publishing a version requires the configured Firebase Admin server endpoint. If Firebase is not configured, the sign-in page explains that setup is unavailable.
@@ -137,3 +139,4 @@ Admins can add and remove existing, active Studio members in the Governance view
 Deploy the updated server before publishing `firestore.rules`. The updated rules reserve project membership updates for the authenticated server endpoint; they do not allow direct browser edits to a project's `memberIds`.
 
 The mobile host must select the client project when it requests a remote screen (for example `projectId: "acme-banking-…"`). The current demo app deliberately continues to load the legacy project until that host integration is enabled.
+
