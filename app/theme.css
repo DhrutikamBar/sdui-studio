@@ -354,3 +354,8 @@ select option { color: var(--ink); background: var(--canvas); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+.home-hero, .home-guidance { max-width: none; }
+.figma-workspace-header, .publish-dialog, .figma-workspace .figma-converter { color: var(--ink); background: var(--glass); border-color: var(--glass-border); }
+.figma-workspace .import-review { color: var(--ink); background: var(--subtle); border-color: var(--glass-border); }
+
