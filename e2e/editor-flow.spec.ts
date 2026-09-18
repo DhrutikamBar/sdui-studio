@@ -85,7 +85,7 @@ test('Figma to JSON reviews generated content before changing the draft', async 
       node: { name: 'Wallet', id: '1:2', type: 'FRAME' },
     }) });
   });
-  await page.getByRole('button', { name: 'Convert design' }).click();
+  await page.getByRole('button', { name: 'Convert design', exact: true }).click();
   await expect(page.locator('.import-review')).toContainText('Imported balance');
   await expect(page.locator('.import-review')).toContainText('Icon: Manual asset needed.');
   await expect(page.getByLabel('Figma access token')).toHaveValue('');
