@@ -729,6 +729,53 @@ pre { max-width: 100%; overflow-x: auto; }
 .workspace-switcher small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-create-button { width: calc(100% - 8px); margin: 0 4px 11px; padding: 9px 10px; border: 1px dashed rgba(255,255,255,.3); border-radius: 10px; color: #e9e8ff; background: rgba(255,255,255,.06); font-size: 11px; font-weight: 750; text-align: left; transition: border-color .18s ease, background .18s ease; }
 .project-create-button:hover { border-color: #aaa5ff; background: rgba(123,116,255,.22); }
+.sidebar .new-screen { margin-bottom: 8px; }
+.new-component { display: flex; align-items: center; gap: 8px; width: calc(100% - 8px); min-height: 42px; margin: 0 4px 18px; padding: 10px 13px; border: 1px solid rgba(166, 157, 255, .35); border-radius: 11px; color: #f3f1ff; background: rgba(117, 107, 240, .14); text-align: left; font-size: 12px; font-weight: 750; }
+.new-component:hover { background: rgba(117, 107, 240, .3); }
+.new-component b { font-size: 17px; font-weight: 400; }
+.saved-component-palette { display: grid; gap: 7px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.saved-component-palette h3 { margin: 0; font-size: 14px; }
+.saved-component-palette > button { display: grid; gap: 2px; width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--subtle); text-align: left; }
+.saved-component-palette > button:hover { border-color: var(--brand); }
+.saved-component-palette > button span { color: var(--muted); font-size: 11px; }
+.save-as-component { width: 100%; margin: 0 0 16px; }
+.component-library-workspace { display: grid; gap: 18px; min-width: 0; }
+.component-workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px; border: 1px solid var(--glass-border); border-radius: 18px; background: var(--glass); }
+.component-workspace-header h1 { margin: 0 0 6px; font-size: clamp(25px, 3vw, 36px); }
+.component-workspace-header p:last-child { margin: 0; color: var(--muted); font-size: 13px; }
+.component-workspace-grid { display: grid; grid-template-columns: minmax(210px, .72fr) minmax(400px, 1.6fr) minmax(270px, .8fr); gap: 16px; align-items: start; min-width: 0; }
+.component-workspace-grid > * { min-width: 0; }
+.component-library-list, .component-editor, .component-preview { display: grid; gap: 12px; }
+.component-library-list > input { width: 100%; }
+.saved-component { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--subtle); }
+.saved-component strong, .saved-component small { display: block; }
+.saved-component small { margin-top: 3px; color: var(--muted); }
+.saved-component p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.saved-component > div:last-child { display: flex; flex-wrap: wrap; gap: 6px; }
+.saved-component button { padding: 6px 9px; font-size: 11px; }
+.component-meta-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.component-meta-fields label { min-width: 0; }
+.component-meta-fields input { width: 100%; }
+.component-description { grid-column: 1 / -1; }
+.component-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.component-examples span { color: var(--muted); font-size: 11px; }
+.component-examples button, .component-widget-grid button { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--subtle); font-size: 11px; }
+.component-editor h3 { margin: 7px 0 0; font-size: 13px; }
+.component-widget-grid { display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto; }
+.component-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.component-edit-grid > div { min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 10px; }
+.component-edit-grid label { display: grid; gap: 5px; margin-top: 10px; }
+.component-edit-grid input, .component-edit-grid select { min-width: 0; width: 100%; }
+.component-outline-node button { width: 100%; padding: 5px 8px; border: 0; border-radius: 7px; color: var(--ink); background: transparent; text-align: left; }
+.component-outline-node button.active { color: var(--accent-ink); background: var(--subtle); font-weight: 800; }
+.component-selected-type { margin: 8px 0; color: var(--muted); text-transform: capitalize; }
+.component-editor .json-label textarea { min-height: 170px; }
+.component-feedback { margin: 0; color: var(--muted); font-size: 12px; }
+.component-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.component-preview-phone { display: grid; justify-content: center; min-width: 0; overflow: auto; }
+@media (max-width: 1300px) { .component-workspace-grid { grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); } .component-preview { grid-column: 1 / -1; } }
+@media (max-width: 750px) { .component-workspace-grid { grid-template-columns: minmax(0, 1fr); } .component-preview { grid-column: auto; } }
+@media (max-width: 520px) { .component-meta-fields, .component-edit-grid { grid-template-columns: minmax(0, 1fr); } .component-description { grid-column: auto; } .component-workspace-header { align-items: flex-start; flex-direction: column; } .workspace-view-tabs button { padding: 7px 2px; } .workspace-view-tabs button > span { display: none; } .workspace-view-tabs strong { font-size: 9px; } }
 .project-dialog-backdrop { z-index: 55; }
 .project-dialog { position: relative; width: min(480px, 100%); padding: 28px; border: 1px solid #e2e5f0; border-radius: 18px; color: #1c2436; background: #fff; box-shadow: 0 28px 80px rgba(10, 18, 45, .32); }
 .project-dialog h2 { margin: 6px 0 8px; font-size: 25px; letter-spacing: -.04em; }
