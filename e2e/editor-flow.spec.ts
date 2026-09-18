@@ -45,6 +45,28 @@ test('theme follows the system, persists a choice, and spans sign-in and editor'
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
+test('saving shows a spinner until the server responds', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One viewport is enough to verify the request state.');
+  await signIn(page);
+  await newScreen(page);
+  let releaseWrite: (() => void) | undefined;
+  let requestStarted: () => void = () => {};
+  const started = new Promise<void>((resolve) => { requestStarted = resolve; });
+  await page.route('**/api/screens/versions', async (route) => {
+    await new Promise<void>((resolve) => { releaseWrite = resolve; requestStarted(); });
+    await route.continue();
+  });
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await started;
+  const saving = page.getByRole('button', { name: 'Saving draft…' });
+  await expect(saving).toHaveAttribute('aria-busy', 'true');
+  await expect(saving.locator('.loading-spinner')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Publish version' })).toBeDisabled();
+  releaseWrite?.();
+  await expect(page.locator('.notice').first()).toContainText('Draft v1 saved');
+  await expect(page.getByRole('button', { name: 'Save draft' })).toHaveAttribute('aria-busy', 'false');
+});
+
 test('draft, preview, publish, and archive work at each viewport', async ({ page }, testInfo) => {
   const width = testInfo.project.use.viewport?.width ?? 1440;
   await signIn(page);

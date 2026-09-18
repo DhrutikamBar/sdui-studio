@@ -100,6 +100,18 @@ body {
 .theme-toggle:active { transform: translateY(0) scale(.97); }
 .theme-toggle-compact { min-height: 34px; padding: 5px 10px; }
 
+/* One quiet activity indicator for every network-backed action. */
+.loading-spinner { display: inline-block; flex: 0 0 auto; width: 15px; height: 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; opacity: .85; animation: loading-spin .7s linear infinite; }
+.loading-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.loading-action[aria-busy="true"] { cursor: progress; }
+.loading-action[aria-busy="true"]:disabled { opacity: .85; }
+.loading-inline { display: inline-flex; align-items: center; gap: 8px; }
+.auth-loading .loading-spinner { width: 19px; height: 19px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; background: transparent; box-shadow: none; animation: loading-spin .7s linear infinite; }
+.member-row strong { display: inline-flex; align-items: center; gap: 7px; }
+.screen-link .loading-spinner { width: 12px; height: 12px; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none !important; } }
+
 /* A compact home header keeps the editing canvas near the top of the page. */
 .workspace-view-tabs { margin-bottom: 16px; }
 .home-hero {
