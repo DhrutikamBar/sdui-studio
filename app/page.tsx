@@ -8,6 +8,7 @@ import { loadRemoteVersions, saveRemoteScreenStatus, saveRemoteVersion, watchRem
 import { writeStudioAudit } from "../lib/studio-governance";
 import { StudioGovernancePanel } from "./governance-panel";
 import { ThemeToggle } from "./theme-toggle";
+import { LoadingSpinner } from "./loading-spinner";
 import { createStudioProject, legacyProject, watchStudioProjects, type StudioProject } from "../lib/studio-projects";
 
 type JsonObject = {
@@ -464,9 +465,15 @@ export default function StudioPage() {
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signInError, setSignInError] = useState("");
-  const [signInBusy, setSignInBusy] = useState(false);
-  const [screenStatusBusy, setScreenStatusBusy] = useState(false);
-  const [versionSaveBusy, setVersionSaveBusy] = useState(false);
+  const [authBusyAction, setAuthBusyAction] = useState<"sign-in" | "reset" | null>(null);
+  const signInBusy = authBusyAction !== null;
+  const [screenStatusAction, setScreenStatusAction] = useState<"Draft" | "Archived" | null>(null);
+  const screenStatusBusy = screenStatusAction !== null;
+  const [versionBusyAction, setVersionBusyAction] = useState<"draft" | "publish" | null>(null);
+  const versionSaveBusy = versionBusyAction !== null;
+  const [projectCreateBusy, setProjectCreateBusy] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [loadingScreenId, setLoadingScreenId] = useState<string | null>(null);
   const versionSaveInFlight = useRef(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
@@ -586,7 +593,7 @@ export default function StudioPage() {
     if (!firebaseUser) { setNotice("Sign in before saving a draft."); return; }
     if (versionSaveInFlight.current) return;
     versionSaveInFlight.current = true;
-    setVersionSaveBusy(true);
+    setVersionBusyAction("draft");
     const screenId = selectedId;
     const requestGeneration = screenLoadGeneration.current;
     try {
@@ -607,7 +614,7 @@ export default function StudioPage() {
       setNotice("Could not confirm the draft save. Refresh its status before retrying: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       versionSaveInFlight.current = false;
-      setVersionSaveBusy(false);
+      setVersionBusyAction(null);
     }
   }
 
@@ -638,7 +645,7 @@ export default function StudioPage() {
     if (!firebaseUser) { setNotice("Sign in before publishing."); return; }
     if (versionSaveInFlight.current) return;
     versionSaveInFlight.current = true;
-    setVersionSaveBusy(true);
+    setVersionBusyAction("publish");
     const screenId = selectedId;
     const requestGeneration = screenLoadGeneration.current;
     try {
@@ -661,12 +668,13 @@ export default function StudioPage() {
       setNotice("Could not confirm the publish. Refresh its status before retrying: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       versionSaveInFlight.current = false;
-      setVersionSaveBusy(false);
+      setVersionBusyAction(null);
     }
   }
 
   function duplicateScreen() {
     screenLoadGeneration.current += 1;
+    setLoadingScreenId(null);
     const id = selectedId + "-copy-" + Date.now();
     const copyRoute = uniqueRoute(route + "-copy", screens);
     const copy: Screen = { id, title: title + " copy", route: copyRoute, status: "Draft", version: 0, updatedAt: "Just now" };
@@ -676,6 +684,8 @@ export default function StudioPage() {
     setRoute(copy.route);
     setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: json }));
     setJson(json);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     setVersions((current) => ({ ...current, [id]: [{ id: id + "-draft", number: 0, status: "Draft", title: copy.title, route: copy.route, document: json, createdAt: "Just now", note: "Copied from " + selectedId }] }));
     setNotice("Created a draft copy. Give it a unique route before publishing.");
   }
@@ -685,7 +695,7 @@ export default function StudioPage() {
     const screen = screens.find((item) => item.id === selectedId);
     if (!screen) return;
     const requestGeneration = screenLoadGeneration.current;
-    setScreenStatusBusy(true);
+    setScreenStatusAction(status);
     try {
       let savedStatus: Screen["status"] = status;
       if (firebaseUser) {
@@ -717,12 +727,13 @@ export default function StudioPage() {
       setSyncDetail("Shared sync needs attention");
       setNotice("Screen status could not be saved: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
-      setScreenStatusBusy(false);
+      setScreenStatusAction(null);
     }
   }
 
   function createScreen() {
     screenLoadGeneration.current += 1;
+    setLoadingScreenId(null);
     setMobileMenuOpen(false);
     setWorkspaceView("build");
     const name = "New screen";
@@ -736,6 +747,8 @@ export default function StudioPage() {
     const document = JSON.stringify({ type: "column", props: { style: { padding: "md" } }, children: [] }, null, 2);
     setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: document }));
     setJson(document);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     setNotice("New draft screen created. Give it a route, add content, then save a draft.");
   }
 
@@ -991,6 +1004,7 @@ export default function StudioPage() {
 
   function chooseProject(project: StudioProject) {
     screenLoadGeneration.current += 1;
+    setLoadingScreenId(null);
     setSelectedProjectId(project.id);
     setScreens(initialScreens);
     setSelectedId("wallet");
@@ -1001,6 +1015,8 @@ export default function StudioPage() {
     setVersions({});
     setSelectedPath([]);
     setNestingTargetPath(null);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     setWorkspaceView("build");
     setMobileMenuOpen(false);
     setNotice("Opened " + project.name + ". Its screen catalog and versions are isolated from other client projects.");
@@ -1008,6 +1024,7 @@ export default function StudioPage() {
 
   async function chooseScreen(screen: Screen) {
     const requestGeneration = ++screenLoadGeneration.current;
+    setLoadingScreenId(null);
     setWorkspaceView("build");
     const fallback = screenDocuments[screen.id] ?? JSON.stringify(
       localScreenDocument(screen.title, "This bundled screen is ready to edit.", "Continue", "home", "#34415B"),
@@ -1021,7 +1038,10 @@ export default function StudioPage() {
     setJson(fallback);
     setSelectedPath([]);
     setNestingTargetPath(null);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     if (firebaseUser && (screen.version > 0 || screen.latestDraftVersion)) {
+      setLoadingScreenId(screen.id);
       try {
         const remoteVersions = await loadRemoteVersions(screen.id, selectedProjectId === legacyProject.id ? undefined : selectedProjectId);
         if (screenLoadGeneration.current !== requestGeneration) return;
@@ -1040,13 +1060,15 @@ export default function StudioPage() {
         if (screenLoadGeneration.current !== requestGeneration) return;
         setNotice("Selected " + screen.title + ". Using bundled draft because Firestore versions could not load: " + (error instanceof Error ? error.message : "Unknown error"));
         return;
+      } finally {
+        if (screenLoadGeneration.current === requestGeneration) setLoadingScreenId(null);
       }
     }
     if (screenLoadGeneration.current === requestGeneration) setNotice("Selected " + screen.title + ". Showing its current draft.");
   }
 
   async function submitProject() {
-    if (!firebaseUser) return;
+    if (!firebaseUser || projectCreateBusy) return;
     const name = projectName.trim();
     const packageName = projectPackageName.trim();
     if (!name || !packageName) {
@@ -1057,6 +1079,7 @@ export default function StudioPage() {
       setProjectError("Use a package identifier such as com.acme.mobile.");
       return;
     }
+    setProjectCreateBusy(true);
     try {
       setProjectError("");
       const project = await createStudioProject({ name, packageName }, { uid: firebaseUser.uid, label: firebaseUser.displayName ?? firebaseUser.email ?? firebaseUser.uid });
@@ -1067,24 +1090,31 @@ export default function StudioPage() {
       chooseProject(project);
     } catch (error) {
       setProjectError(error instanceof Error ? error.message : "Project creation failed. Check your Studio role and Firestore rules.");
+    } finally {
+      setProjectCreateBusy(false);
     }
   }
 
   async function signOutFromStudio() {
+    if (signOutBusy) return;
+    setSignOutBusy(true);
     try {
       await signOutOfStudio();
       setNotice("Signed out of the shared workspace.");
     } catch (error) {
       setNotice("Sign-out failed: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setSignOutBusy(false);
     }
   }
 
   async function submitStudioSignIn() {
+    if (signInBusy) return;
     if (!signInEmail.trim() || !signInPassword) {
       setSignInError("Enter your email address and password.");
       return;
     }
-    setSignInBusy(true);
+    setAuthBusyAction("sign-in");
     setSignInError("");
     try {
       await signInToStudio(signInEmail.trim(), signInPassword);
@@ -1093,16 +1123,17 @@ export default function StudioPage() {
     } catch (error) {
       setSignInError(error instanceof Error ? error.message.replace("Firebase: ", "") : "Sign-in failed. Check your email and password.");
     } finally {
-      setSignInBusy(false);
+      setAuthBusyAction(null);
     }
   }
 
   async function requestPasswordReset() {
+    if (signInBusy) return;
     if (!signInEmail.trim()) {
       setSignInError("Enter your email address first, then request a reset link.");
       return;
     }
-    setSignInBusy(true);
+    setAuthBusyAction("reset");
     setSignInError("");
     try {
       await resetStudioPassword(signInEmail.trim());
@@ -1110,19 +1141,32 @@ export default function StudioPage() {
     } catch (error) {
       setSignInError(error instanceof Error ? error.message.replace("Firebase: ", "") : "Could not request a reset link.");
     } finally {
-      setSignInBusy(false);
+      setAuthBusyAction(null);
     }
   }
 
   if (!authReady) {
-    return <main className="auth-page"><div className="auth-loading"><span>◆</span><strong>Preparing FlexFlow UI</strong><small>Checking your secure workspace…</small></div></main>;
+    return <main className="auth-page"><div className="auth-loading"><span className="loading-mark"><LoadingSpinner /></span><strong>Preparing FlexFlow UI</strong><small>Checking your secure workspace…</small></div></main>;
   }
 
   if (!firebaseUser) {
-    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>FlexFlow UI</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for FlexFlow UI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-theme-control"><ThemeToggle /></div><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>Forgot password?</button><button className="primary auth-submit" disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{signInBusy ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
+    return <main className="auth-page"><section className="auth-showcase"><div className="auth-brand"><span>◆</span><strong>FlexFlow UI</strong></div><div><p className="eyebrow">MOBILE EXPERIENCE PLATFORM</p><h1>Build, review, and publish mobile experiences together.</h1><p>One secure workspace for FlexFlow UI screens, data bindings, version history, and mobile preview.</p></div><div className="auth-points"><span>Visual screen builder</span><span>Shared version history</span><span>Safe Firestore publishing</span></div></section><section className="auth-card"><div className="auth-theme-control"><ThemeToggle /></div><div className="auth-card-heading"><p className="eyebrow">SECURE WORKSPACE</p><h2>Welcome back</h2><p>Use your administrator-created Studio account to continue.</p></div>{!isFirebaseConfigured && <p className="sign-in-error">Firebase setup is not available for this deployment.</p>}<label>Work email<input type="email" autoComplete="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} placeholder="you@company.com" /></label><label>Password<input type="password" autoComplete="current-password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitStudioSignIn(); }} placeholder="Your password" /></label>{signInError && <p className="sign-in-error">{signInError}</p>}<button className="reset-link loading-action" aria-busy={authBusyAction === "reset"} disabled={signInBusy || !isFirebaseConfigured} onClick={() => void requestPasswordReset()}>{authBusyAction === "reset" && <LoadingSpinner />}{authBusyAction === "reset" ? "Sending link…" : "Forgot password?"}</button><button className="primary auth-submit loading-action" aria-busy={authBusyAction === "sign-in"} disabled={signInBusy || !isFirebaseConfigured} onClick={() => void submitStudioSignIn()}>{authBusyAction === "sign-in" && <LoadingSpinner />}{authBusyAction === "sign-in" ? "Signing in…" : "Sign in to Studio"}</button><small className="auth-help">Need access? Ask a Studio administrator to create your account.</small></section></main>;
   }
 
   const profileInitial = (firebaseUser.displayName ?? firebaseUser.email ?? "S").trim().charAt(0).toUpperCase();
+  const homeNextStep = selectedScreen?.status === "Archived"
+    ? "Restore this screen to continue editing or publishing."
+    : parsed.error
+      ? "Fix the document issue below, then save a draft."
+      : selectedScreen?.status === "Published" && !selectedScreen.latestDraftVersion
+        ? "This version is live. Save a new draft when you have a change."
+      : !selectedScreen?.latestDraftVersion
+        ? "Save a draft to keep your changes in the shared workspace."
+        : !previewConfirmed
+          ? "Preview content, loading, empty, and error states before publishing."
+          : !publishNote.trim()
+            ? "Add a release note to explain what changed."
+            : "Everything is ready. Publish when your review is complete.";
 
   return (
     <main className="studio-shell">
@@ -1138,8 +1182,8 @@ export default function StudioPage() {
         <label className="screen-search"><span>⌕</span><input aria-label="Find a screen" value={screenSearch} onChange={(event) => setScreenSearch(event.target.value)} placeholder="Find a screen" /></label>
         <nav aria-label="Screen library">
           {visibleScreens.map((screen) => (
-            <button key={screen.id} aria-current={screen.id === selectedId ? "page" : undefined} className={"screen-link " + (screen.id === selectedId ? "active" : "")} onClick={() => { void chooseScreen(screen); setMobileMenuOpen(false); }}>
-              <span className="screen-link-main"><b>{screen.title.slice(0, 1).toUpperCase()}</b><span className="screen-link-name">{screen.title}</span></span>
+            <button key={screen.id} aria-current={screen.id === selectedId ? "page" : undefined} className={"screen-link " + (screen.id === selectedId ? "active" : "")} aria-busy={loadingScreenId === screen.id} disabled={loadingScreenId === screen.id} onClick={() => { void chooseScreen(screen); setMobileMenuOpen(false); }}>
+              <span className="screen-link-main"><b>{screen.title.slice(0, 1).toUpperCase()}</b><span className="screen-link-name">{screen.title}</span>{loadingScreenId === screen.id && <LoadingSpinner />}</span>
               <span className="screen-link-states">
                 {screen.status !== "Archived" && screen.latestDraftVersion && <em className="draft">Draft v{screen.latestDraftVersion}</em>}
                 {screen.status === "Published" ? <em className="published">Live v{screen.version}</em> : screen.status === "Archived" ? <em className="archived">Archived</em> : !screen.latestDraftVersion ? <em className="draft">Draft</em> : null}
@@ -1156,9 +1200,9 @@ export default function StudioPage() {
       <section className="workspace">
         <header className="app-topbar">
           <div className="app-brand"><span>◆</span><strong>FlexFlow UI</strong><em>{selectedProject.name} · {selectedProject.packageName}</em></div>
-          <div className="app-user"><ThemeToggle compact /><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button" onClick={() => void signOutFromStudio()}>Log out</button></div>
+          <div className="app-user"><ThemeToggle compact /><div className={"sync-state " + syncState}><span>{syncState === "syncing" ? "◌" : syncState === "saved" ? "●" : syncState === "failed" ? "!" : "○"}</span><small>{syncDetail}</small></div><div className="profile-chip" title={firebaseUser.email ?? "Studio account"}><span>{profileInitial}</span><div><strong>{firebaseUser.displayName ?? "Studio member"}</strong><small>{firebaseUser.email}</small></div></div><button className="logout-button loading-action" aria-busy={signOutBusy} disabled={signOutBusy} onClick={() => void signOutFromStudio()}>{signOutBusy && <LoadingSpinner />}{signOutBusy ? "Signing out…" : "Log out"}</button></div>
         </header>
-        {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section ref={projectDialogRef} className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary" onClick={() => void submitProject()}>Create project</button></div></section></div>}
+        {showProjectDialog && <div className="floating-preview-backdrop project-dialog-backdrop" role="presentation"><section ref={projectDialogRef} className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><button className="dialog-close" disabled={projectCreateBusy} onClick={() => setShowProjectDialog(false)} aria-label="Close">×</button><p className="eyebrow">NEW CLIENT PROJECT</p><h2 id="new-project-title">Create an isolated workspace</h2><p>Its screens, drafts, published versions, and package identifier stay separate from every other client.</p><label>Project name<input value={projectName} disabled={projectCreateBusy} onChange={(event) => setProjectName(event.target.value)} placeholder="Acme Banking" autoFocus /></label><label>Android / iOS package name<input value={projectPackageName} disabled={projectCreateBusy} onChange={(event) => setProjectPackageName(event.target.value)} placeholder="com.acme.mobile" /></label>{projectError && <div className="project-error">{projectError}</div>}<div className="dialog-actions"><button className="secondary" disabled={projectCreateBusy} onClick={() => setShowProjectDialog(false)}>Cancel</button><button className="primary loading-action" aria-busy={projectCreateBusy} disabled={projectCreateBusy} onClick={() => void submitProject()}>{projectCreateBusy && <LoadingSpinner />}{projectCreateBusy ? "Creating…" : "Create project"}</button></div></section></div>}
         <nav className="workspace-view-tabs" aria-label="Studio workspace sections">
           <button className={workspaceView === "build" ? "active" : ""} aria-current={workspaceView === "build" ? "page" : undefined} onClick={() => setWorkspaceView("build")}><span>◫</span><div><strong>Build</strong><small>Screen editor</small></div></button>
           <button className={workspaceView === "preview" ? "active" : ""} aria-current={workspaceView === "preview" ? "page" : undefined} onClick={() => setWorkspaceView("preview")}><span>▣</span><div><strong>Preview</strong><small>Test states</small></div></button>
@@ -1166,13 +1210,17 @@ export default function StudioPage() {
         </nav>
 
         {workspaceView === "build" && <>
-        <header className="topbar">
-          <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">{screenVersionLabel} · Updated {selectedScreen?.updatedAt ?? "now"}</small></div>
-          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button></div>
+        <header className="home-hero">
+          <div className="home-hero-copy">
+            <p className="eyebrow">BUILD WORKSPACE / {selectedProject.name.toUpperCase()}</p>
+            <div className="home-title-line"><h1>{title}</h1><span className={"home-health " + (parsed.error ? "needs-review" : "healthy")}>{parsed.error ? "Needs review" : "Validated"}</span></div>
+            <p className="home-subtitle">Edit and release the <code>/{route}</code> mobile screen.</p>
+            <div className="home-meta"><span>{screenVersionLabel}</span><span>Updated {selectedScreen?.updatedAt ?? "now"}</span>{loadingScreenId && <span className="loading-inline"><LoadingSpinner />Loading screen…</span>}</div>
+          </div>
+          <div className="home-hero-actions"><button className="secondary action-preview" onClick={() => setShowFloatingPreview(true)}>Preview screen</button><button className="secondary action-save loading-action" aria-busy={versionBusyAction === "draft"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>{versionBusyAction === "draft" && <LoadingSpinner />}{versionBusyAction === "draft" ? "Saving draft…" : "Save draft"}</button><button className="primary action-publish loading-action" aria-busy={versionBusyAction === "publish"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>{versionBusyAction === "publish" && <LoadingSpinner />}{versionBusyAction === "publish" ? "Publishing…" : "Publish version"}</button></div>
         </header>
-        <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
-        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{selectedScreen?.latestDraftVersion ? "Draft v" + selectedScreen.latestDraftVersion : selectedScreen?.status === "Published" ? "Live v" + selectedScreen.version : selectedScreen?.status ?? "Draft"}</strong><small>{selectedScreen?.latestDraftVersion ? selectedScreen.version ? "Live v" + selectedScreen.version + " remains published" : "Not published yet" : publishedCount + " published screen" + (publishedCount === 1 ? "" : "s") + " in this workspace"}</small></div></section>
-
+        <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary loading-action" aria-busy={versionBusyAction === "draft"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>{versionBusyAction === "draft" && <LoadingSpinner />}{versionBusyAction === "draft" ? "Saving…" : "Save draft"}</button><button className="primary loading-action" aria-busy={versionBusyAction === "publish"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>{versionBusyAction === "publish" && <LoadingSpinner />}{versionBusyAction === "publish" ? "Publishing…" : "Publish version"}</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
+        <div className="home-guidance"><div className="home-next-step"><span className="home-next-icon" aria-hidden="true">↗</span><div><strong>Next step</strong><p>{homeNextStep}</p></div></div><div className="home-secondary-actions"><button onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="loading-action" aria-busy={screenStatusAction === "Draft"} disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>{screenStatusAction === "Draft" && <LoadingSpinner />}{screenStatusAction === "Draft" ? "Restoring…" : "Restore screen"}</button> : <button className="loading-action" aria-busy={screenStatusAction === "Archived"} disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>{screenStatusAction === "Archived" && <LoadingSpinner />}{screenStatusAction === "Archived" ? "Archiving…" : "Archive"}</button>}</div></div>
         <div className="notice" role="status">{notice}</div>
 
         <div className="studio-grid">

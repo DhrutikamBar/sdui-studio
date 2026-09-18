@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { resetStudioPassword } from "../lib/firebase";
 import { changeStudioProjectMember, type StudioProject } from "../lib/studio-projects";
+import { LoadingSpinner } from "./loading-spinner";
 import {
   loadStudioMember,
   observeStudioAudit,
@@ -34,6 +35,10 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
   const [active, setActive] = useState(true);
   const [projectMemberUid, setProjectMemberUid] = useState("");
   const [projectBusy, setProjectBusy] = useState(false);
+  const [projectBusyAction, setProjectBusyAction] = useState<{ uid: string; action: "add" | "remove" } | null>(null);
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [memberBusyUid, setMemberBusyUid] = useState<string | null>(null);
+  const [resetBusyUid, setResetBusyUid] = useState<string | null>(null);
 
   useEffect(() => setProjectMemberUid(""), [project.id]);
 
@@ -78,6 +83,7 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
   async function changeProjectAccess(targetUid: string, action: "add" | "remove") {
     if (!canManage || project.id === "legacy" || projectBusy) return;
     setProjectBusy(true);
+    setProjectBusyAction({ uid: targetUid, action });
     setError("");
     try {
       await changeStudioProjectMember({ projectId: project.id, targetUid, action });
@@ -88,15 +94,17 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
       setError(reason instanceof Error ? reason.message : "Could not update project access.");
     } finally {
       setProjectBusy(false);
+      setProjectBusyAction(null);
     }
   }
 
   async function saveAccessRecord() {
-    if (!canManage) return;
+    if (!canManage || accessBusy) return;
     if (!uid.trim() || !email.trim()) {
       setNotice("Enter the Firebase Authentication UID and email address first.");
       return;
     }
+    setAccessBusy(true);
     try {
       await saveStudioMember({
         uid: uid.trim(),
@@ -116,11 +124,14 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
       setActive(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save the access record.");
+    } finally {
+      setAccessBusy(false);
     }
   }
 
   async function updateMember(member: StudioMember, changes: Partial<Pick<StudioMember, "role" | "active">>) {
-    if (!canManage) return;
+    if (!canManage || memberBusyUid) return;
+    setMemberBusyUid(member.uid);
     try {
       await saveStudioMember({ ...member, ...changes }, {
         uid: currentActor.uid,
@@ -129,15 +140,21 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
       setNotice("Access updated for " + member.email + ".");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not update access.");
+    } finally {
+      setMemberBusyUid(null);
     }
   }
 
   async function sendReset(member: StudioMember) {
+    if (resetBusyUid) return;
+    setResetBusyUid(member.uid);
     try {
       await resetStudioPassword(member.email);
       setNotice("Password reset email requested for " + member.email + ".");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not request the password reset.");
+    } finally {
+      setResetBusyUid(null);
     }
   }
 
@@ -153,7 +170,7 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
       </div>
       {error && <p className="governance-error">{error}</p>}
       {notice && <p className="governance-notice">{notice}</p>}
-      {!profile && !error && <p className="empty-state">Loading your Studio access record…</p>}
+      {!profile && !error && <p className="empty-state loading-inline"><LoadingSpinner />Loading your Studio access record…</p>}
 
       {canManage && <div className="access-grid">
         <section className="governance-card">
@@ -165,17 +182,17 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
             <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Optional" /></label>
             <label>Role<select value={role} onChange={(event) => setRole(event.target.value as StudioRole)}>{roles.map((value) => <option key={value}>{value}</option>)}</select></label>
             <label className="check-label"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /> Account can access Studio</label>
-            <button className="primary" type="button" onClick={saveAccessRecord}>Save access</button>
+            <button className="primary loading-action" type="button" aria-busy={accessBusy} disabled={accessBusy} onClick={saveAccessRecord}>{accessBusy && <LoadingSpinner />}{accessBusy ? "Saving access…" : "Save access"}</button>
           </div>
         </section>
         <section className="governance-card">
           <h3>Studio members</h3>
           <div className="member-list">
             {members.map((member) => <div className="member-row" key={member.uid}>
-              <div><strong>{member.displayName || member.email}</strong><small>{member.email}</small></div>
-              <select aria-label={"Role for " + member.email} value={member.role} disabled={member.uid === currentActor.uid} onChange={(event) => void updateMember(member, { role: event.target.value as StudioRole })}>{roles.map((value) => <option key={value}>{value}</option>)}</select>
-              <label className="member-active"><input type="checkbox" checked={member.active} disabled={member.uid === currentActor.uid} onChange={(event) => void updateMember(member, { active: event.target.checked })} /> Active</label>
-              <button className="link-button" type="button" onClick={() => void sendReset(member)}>Reset password</button>
+              <div><strong>{member.displayName || member.email}{memberBusyUid === member.uid && <LoadingSpinner />}</strong><small>{member.email}</small></div>
+              <select aria-label={"Role for " + member.email} value={member.role} disabled={member.uid === currentActor.uid || memberBusyUid !== null} onChange={(event) => void updateMember(member, { role: event.target.value as StudioRole })}>{roles.map((value) => <option key={value}>{value}</option>)}</select>
+              <label className="member-active"><input type="checkbox" checked={member.active} disabled={member.uid === currentActor.uid || memberBusyUid !== null} onChange={(event) => void updateMember(member, { active: event.target.checked })} /> Active</label>
+              <button className="link-button loading-action" type="button" aria-busy={resetBusyUid === member.uid} disabled={resetBusyUid !== null} onClick={() => void sendReset(member)}>{resetBusyUid === member.uid && <LoadingSpinner />}{resetBusyUid === member.uid ? "Sending…" : "Reset password"}</button>
             </div>)}
             {!members.length && <p className="empty-state">No access records are visible yet.</p>}
           </div>
@@ -192,13 +209,13 @@ export function StudioGovernancePanel({ actor, project }: { actor: StudioActor |
                 <option value="">Choose a Studio member</option>
                 {availableProjectMembers.map((member) => <option key={member.uid} value={member.uid}>{member.displayName ? member.displayName + " · " : ""}{member.email} ({member.role})</option>)}
               </select></label>
-              <button className="primary" type="button" disabled={!projectMemberUid || projectBusy} onClick={() => void changeProjectAccess(projectMemberUid, "add")}>Add to project</button>
+              <button className="primary loading-action" type="button" aria-busy={projectBusyAction?.action === "add"} disabled={!projectMemberUid || projectBusy} onClick={() => void changeProjectAccess(projectMemberUid, "add")}>{projectBusyAction?.action === "add" && <LoadingSpinner />}{projectBusyAction?.action === "add" ? "Adding…" : "Add to project"}</button>
             </div>
             {!availableProjectMembers.length && <p className="empty-state">All active Studio members already have access.</p>}
             <div className="project-member-list">
               {projectMembers.map((member) => <div className="project-member-row" key={member.uid}>
                 <div><strong>{member.displayName || member.email}</strong><small>{member.email !== member.uid ? member.email + " · " : ""}{member.active ? member.role : "Inactive or missing Studio record"}</small></div>
-                <button className="link-button" type="button" disabled={member.uid === currentActor.uid || projectBusy} onClick={() => void changeProjectAccess(member.uid, "remove")}>{member.uid === currentActor.uid ? "Current admin" : "Remove from project"}</button>
+                <button className="link-button loading-action" type="button" aria-busy={projectBusyAction?.action === "remove" && projectBusyAction.uid === member.uid} disabled={member.uid === currentActor.uid || projectBusy} onClick={() => void changeProjectAccess(member.uid, "remove")}>{projectBusyAction?.action === "remove" && projectBusyAction.uid === member.uid && <LoadingSpinner />}{member.uid === currentActor.uid ? "Current admin" : projectBusyAction?.action === "remove" && projectBusyAction.uid === member.uid ? "Removing…" : "Remove from project"}</button>
               </div>)}
             </div>
           </> : <p>Only an active Studio admin who belongs to this project can change its members.</p>}
