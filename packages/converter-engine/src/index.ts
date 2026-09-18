@@ -22,6 +22,7 @@ export interface FigmaLikeNode {
   paddingBottom?: number;
   paddingLeft?: number;
   itemSpacing?: number;
+  style?: { fontSize?: number; fontWeight?: number };
 }
 
 export interface ConversionWarning {
@@ -110,6 +111,9 @@ function convertNode(
     ? directive.kind
     : containerTypeFor(node);
   const children = childrenOf(node, warnings);
+  if (isContainer(node) && node.layoutMode === "NONE" && children.length > 1) {
+    warnings.push(warning(node, "Free-positioned layers were converted in layer order; review their layout."));
+  }
 
   if (!children.length && !isContainer(node)) {
     warnings.push(warning(node, `Unsupported layer type ${node.type} was omitted.`));
@@ -145,6 +149,14 @@ function isUnsupportedVisual(type: string) {
 
 function styleOf(node: FigmaLikeNode, warnings: ConversionWarning[]) {
   const props: { [key: string]: FlexflowValue } = {};
+  if (node.type === "TEXT") {
+    const fontSize = node.style?.fontSize;
+    const fontWeight = node.style?.fontWeight;
+    if (typeof fontSize === "number" && fontSize > 0) props.fontSize = Math.round(fontSize);
+    if (typeof fontWeight === "number") {
+      props.fontWeight = fontWeight >= 700 ? "bold" : fontWeight >= 600 ? "semibold" : fontWeight >= 500 ? "medium" : fontWeight <= 300 ? "light" : "normal";
+    }
+  }
   const padding = Math.max(node.paddingTop ?? 0, node.paddingRight ?? 0, node.paddingBottom ?? 0, node.paddingLeft ?? 0);
   if (padding > 0) props.padding = spacingToken(padding);
   if (node.itemSpacing && node.itemSpacing > 0) {
@@ -212,3 +224,4 @@ function normalizeName(name: string) {
 function warning(node: FigmaLikeNode, message: string): ConversionWarning {
   return { nodeId: node.id, nodeName: node.name, message };
 }
+
