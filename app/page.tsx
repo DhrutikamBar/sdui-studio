@@ -676,6 +676,8 @@ export default function StudioPage() {
     setRoute(copy.route);
     setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: json }));
     setJson(json);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     setVersions((current) => ({ ...current, [id]: [{ id: id + "-draft", number: 0, status: "Draft", title: copy.title, route: copy.route, document: json, createdAt: "Just now", note: "Copied from " + selectedId }] }));
     setNotice("Created a draft copy. Give it a unique route before publishing.");
   }
@@ -736,6 +738,8 @@ export default function StudioPage() {
     const document = JSON.stringify({ type: "column", props: { style: { padding: "md" } }, children: [] }, null, 2);
     setScreenDocuments((current) => ({ ...current, [selectedId]: json, [id]: document }));
     setJson(document);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     setNotice("New draft screen created. Give it a route, add content, then save a draft.");
   }
 
@@ -1001,6 +1005,8 @@ export default function StudioPage() {
     setVersions({});
     setSelectedPath([]);
     setNestingTargetPath(null);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     setWorkspaceView("build");
     setMobileMenuOpen(false);
     setNotice("Opened " + project.name + ". Its screen catalog and versions are isolated from other client projects.");
@@ -1021,6 +1027,8 @@ export default function StudioPage() {
     setJson(fallback);
     setSelectedPath([]);
     setNestingTargetPath(null);
+    setPublishNote("");
+    setPreviewConfirmed(false);
     if (firebaseUser && (screen.version > 0 || screen.latestDraftVersion)) {
       try {
         const remoteVersions = await loadRemoteVersions(screen.id, selectedProjectId === legacyProject.id ? undefined : selectedProjectId);
@@ -1123,6 +1131,19 @@ export default function StudioPage() {
   }
 
   const profileInitial = (firebaseUser.displayName ?? firebaseUser.email ?? "S").trim().charAt(0).toUpperCase();
+  const homeNextStep = selectedScreen?.status === "Archived"
+    ? "Restore this screen to continue editing or publishing."
+    : parsed.error
+      ? "Fix the document issue below, then save a draft."
+      : selectedScreen?.status === "Published" && !selectedScreen.latestDraftVersion
+        ? "This version is live. Save a new draft when you have a change."
+      : !selectedScreen?.latestDraftVersion
+        ? "Save a draft to keep your changes in the shared workspace."
+        : !previewConfirmed
+          ? "Preview content, loading, empty, and error states before publishing."
+          : !publishNote.trim()
+            ? "Add a release note to explain what changed."
+            : "Everything is ready. Publish when your review is complete.";
 
   return (
     <main className="studio-shell">
@@ -1166,13 +1187,17 @@ export default function StudioPage() {
         </nav>
 
         {workspaceView === "build" && <>
-        <header className="topbar">
-          <div><p className="eyebrow">SCREEN LIBRARY / {route.toUpperCase()}</p><h1>{title}</h1><small className="screen-context">{screenVersionLabel} · Updated {selectedScreen?.updatedAt ?? "now"}</small></div>
-          <div className="top-actions"><button className="secondary" onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button className="secondary" disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}<button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button></div>
+        <header className="home-hero">
+          <div className="home-hero-copy">
+            <p className="eyebrow">BUILD WORKSPACE / {selectedProject.name.toUpperCase()}</p>
+            <div className="home-title-line"><h1>{title}</h1><span className={"home-health " + (parsed.error ? "needs-review" : "healthy")}>{parsed.error ? "Needs review" : "Validated"}</span></div>
+            <p className="home-subtitle">Edit and release the <code>/{route}</code> mobile screen.</p>
+            <div className="home-meta"><span>{screenVersionLabel}</span><span>Updated {selectedScreen?.updatedAt ?? "now"}</span></div>
+          </div>
+          <div className="home-hero-actions"><button className="secondary action-preview" onClick={() => setShowFloatingPreview(true)}>Preview screen</button><button className="secondary action-save" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary action-publish" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button></div>
         </header>
         <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>Save draft</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>Publish version</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
-        <section className="workspace-insights" aria-label="Workspace summary"><div><span>ACTIVE SCREEN</span><strong>/{route}</strong><small>Editing a reusable mobile document</small></div><div><span>DOCUMENT HEALTH</span><strong className={parsed.error ? "metric-warning" : "metric-success"}>{parsed.error ? "Needs review" : "Validated"}</strong><small>{parsed.error ? "Fix document issues before publishing" : "Schema and bindings are ready"}</small></div><div><span>RELEASE STATUS</span><strong>{selectedScreen?.latestDraftVersion ? "Draft v" + selectedScreen.latestDraftVersion : selectedScreen?.status === "Published" ? "Live v" + selectedScreen.version : selectedScreen?.status ?? "Draft"}</strong><small>{selectedScreen?.latestDraftVersion ? selectedScreen.version ? "Live v" + selectedScreen.version + " remains published" : "Not published yet" : publishedCount + " published screen" + (publishedCount === 1 ? "" : "s") + " in this workspace"}</small></div></section>
-
+        <div className="home-guidance"><div className="home-next-step"><span className="home-next-icon" aria-hidden="true">↗</span><div><strong>Next step</strong><p>{homeNextStep}</p></div></div><div className="home-secondary-actions"><button onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>Restore screen</button> : <button disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>Archive</button>}</div></div>
         <div className="notice" role="status">{notice}</div>
 
         <div className="studio-grid">

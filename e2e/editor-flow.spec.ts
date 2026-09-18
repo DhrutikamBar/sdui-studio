@@ -24,6 +24,7 @@ async function newScreen(page: Page) {
   await expect(page.locator('.sidebar')).toBeHidden();
   await expect(menu).toBeVisible();
   await expect(page.getByRole('heading', { name: 'New screen' })).toBeVisible();
+  await expect(page.locator('.home-next-step')).toContainText('Save a draft');
 }
 
 test('theme follows the system, persists a choice, and spans sign-in and editor', async ({ page }, testInfo) => {
