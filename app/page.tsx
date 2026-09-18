@@ -5,8 +5,10 @@ import { validateFlexflowDocument } from "../lib/validate";
 import { collectionBindingPath } from "../lib/preview-bindings";
 import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToStudio, signOutOfStudio, studioIdToken } from "../lib/firebase";
 import { loadRemoteVersions, saveRemoteScreenStatus, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
-import { writeStudioAudit } from "../lib/studio-governance";
+import { loadStudioMember, writeStudioAudit, type StudioRole } from "../lib/studio-governance";
 import { StudioGovernancePanel } from "./governance-panel";
+import { ComponentLibraryPanel } from "./component-library-panel";
+import { copyComponentTree, loadStudioComponents, type StudioComponent } from "../lib/component-library";
 import { ThemeToggle } from "./theme-toggle";
 import { LoadingSpinner } from "./loading-spinner";
 import { createStudioProject, legacyProject, watchStudioProjects, type StudioProject } from "../lib/studio-projects";
@@ -452,7 +454,13 @@ export default function StudioPage() {
   const [showFloatingPreview, setShowFloatingPreview] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<"build" | "preview" | "governance" | "figma">("build");
+  const [workspaceView, setWorkspaceView] = useState<"build" | "preview" | "governance" | "figma" | "components">("build");
+  const [studioRole, setStudioRole] = useState<StudioRole>("reviewer");
+  const [components, setComponents] = useState<StudioComponent[]>([]);
+  const [componentLoadError, setComponentLoadError] = useState("");
+  const [componentDraftSeed, setComponentDraftSeed] = useState<JsonObject | null>(null);
+  const [componentEditorKey, setComponentEditorKey] = useState(0);
+  const [componentModuleOpened, setComponentModuleOpened] = useState(false);
   const [sampleScenario, setSampleScenario] = useState("standard");
   const [showArchived, setShowArchived] = useState(false);
   const [screenSearch, setScreenSearch] = useState("");
@@ -541,6 +549,30 @@ export default function StudioPage() {
     setSyncDetail(user ? "Signed in — connecting to shared workspace" : "Local browser workspace");
     setAuthReady(true);
   }), []);
+
+  useEffect(() => {
+    if (!firebaseUser) { setStudioRole("reviewer"); return; }
+    let current = true;
+    void loadStudioMember(firebaseUser.uid).then((member) => { if (current) setStudioRole(member?.role ?? "reviewer"); });
+    return () => { current = false; };
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    if (!firebaseUser) { setComponents([]); return; }
+    let current = true;
+    setComponents([]);
+    setComponentLoadError("");
+    void loadStudioComponents(selectedProjectId).then((items) => { if (current) setComponents(items); }).catch((error) => {
+      if (current) setComponentLoadError(error instanceof Error ? error.message : "Could not load components.");
+    });
+    return () => { current = false; };
+  }, [firebaseUser, selectedProjectId]);
+
+  async function refreshComponents() {
+    const items = await loadStudioComponents(selectedProjectId);
+    setComponents(items);
+    setComponentLoadError("");
+  }
 
   useEffect(() => {
     if (!firebaseUser) return;
@@ -762,6 +794,32 @@ export default function StudioPage() {
     setPublishNote("");
     setPreviewConfirmed(false);
     setNotice("New draft screen created. Give it a route, add content, then save a draft.");
+  }
+
+  function openNewComponent(source: JsonObject | null = null) {
+    setComponentDraftSeed(source ? copyComponentTree(source) : null);
+    setComponentEditorKey((value) => value + 1);
+    setComponentModuleOpened(true);
+    setWorkspaceView("components");
+    setMobileMenuOpen(false);
+  }
+
+  function insertSavedComponent(component: StudioComponent) {
+    if (!parsed.document) { setNotice("Fix the screen JSON before adding a saved component."); setWorkspaceView("build"); return; }
+    const document = JSON.parse(JSON.stringify(parsed.document)) as JsonObject;
+    const selectedContainer = nodeAtPath(document, selectedPath);
+    const candidate = selectedContainer && isContainer(selectedContainer) ? selectedContainer : document;
+    const inserted = copyComponentTree(component.document);
+    if (!isContainer(candidate)) {
+      setJson(JSON.stringify({ type: "column", children: [document, inserted] }, null, 2));
+      setSelectedPath([1]);
+    } else {
+      candidate.children = [...(candidate.children ?? []), inserted];
+      setJson(JSON.stringify(document, null, 2));
+      setSelectedPath([...(candidate === document ? [] : selectedPath), candidate.children.length - 1]);
+    }
+    setWorkspaceView("build");
+    setNotice(component.name + " added to the screen draft. This copy can be edited independently; save the draft when ready.");
   }
 
   function inspectImport(document: JsonObject): string[] {
@@ -1064,6 +1122,9 @@ export default function StudioPage() {
     setJson(JSON.stringify(starterDocument, null, 2));
     setScreenDocuments(Object.fromEntries(Object.entries(localScreenDocuments).map(([id, document]) => [id, JSON.stringify(document, null, 2)])));
     setVersions({});
+    setComponents([]);
+    setComponentDraftSeed(null);
+    setComponentEditorKey((value) => value + 1);
     setSelectedPath([]);
     setNestingTargetPath(null);
     setPublishNote("");
@@ -1228,6 +1289,7 @@ export default function StudioPage() {
         <div className="workspace-switcher"><span>CLIENT PROJECT</span><select value={selectedProjectId} onChange={(event) => chooseProject(projects.find((project) => project.id === event.target.value) ?? legacyProject)} aria-label="Active client project">{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><small>{selectedProject.packageName}</small></div>
         <button className="project-create-button" onClick={() => { setMobileMenuOpen(false); setProjectError(""); setShowProjectDialog(true); }}>＋ New client project</button>
         <button className="new-screen" onClick={createScreen}><b>＋</b> New screen <kbd>N</kbd></button>
+        <button className="new-component" onClick={() => openNewComponent()}><b>＋</b> New Component</button>
         <div className="sidebar-summary"><div><strong>{activeScreens.length}</strong><span>screens</span></div><div><strong>{publishedCount}</strong><span>live</span></div><div><strong>{syncState === "saved" ? "●" : "○"}</strong><span>sync</span></div></div>
         <div className="sidebar-label-row"><p className="sidebar-label">SCREEN LIBRARY</p><button onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Archived"}</button></div>
         <label className="screen-search"><span>⌕</span><input aria-label="Find a screen" value={screenSearch} onChange={(event) => setScreenSearch(event.target.value)} placeholder="Find a screen" /></label>
@@ -1259,6 +1321,7 @@ export default function StudioPage() {
           <button className={workspaceView === "preview" ? "active" : ""} aria-current={workspaceView === "preview" ? "page" : undefined} onClick={() => setWorkspaceView("preview")}><span>▣</span><div><strong>Preview</strong><small>Test states</small></div></button>
           <button className={workspaceView === "governance" ? "active" : ""} aria-current={workspaceView === "governance" ? "page" : undefined} onClick={() => setWorkspaceView("governance")}><span>◈</span><div><strong>Governance</strong><small>People & activity</small></div></button>
           <button className={workspaceView === "figma" ? "active" : ""} aria-current={workspaceView === "figma" ? "page" : undefined} onClick={() => setWorkspaceView("figma")}><span>◇</span><div><strong>Figma to JSON</strong><small>Convert designs</small></div></button>
+          <button className={workspaceView === "components" ? "active" : ""} aria-current={workspaceView === "components" ? "page" : undefined} onClick={() => { setComponentModuleOpened(true); setWorkspaceView("components"); }}><span>▦</span><div><strong>Components</strong><small>Reusable groups</small></div></button>
         </nav>
 
         {workspaceView === "build" && <>
@@ -1305,11 +1368,13 @@ export default function StudioPage() {
               <div className="palette-grid">
                 {Object.keys(componentTemplates).map((kind) => <button key={kind} onClick={() => addComponent(kind)}><strong>+ {kind}</strong><span>Add to root</span></button>)}
               </div>
+              <div className="saved-component-palette"><div className="panel-heading compact"><div><h3>My components</h3><p>Reusable groups in {selectedProject.name}</p></div><button className="link-button" onClick={() => openNewComponent()}>Create</button></div>{components.map((component) => <button key={component.id} onClick={() => insertSavedComponent(component)}><strong>+ {component.name}</strong><span>{component.category} · {component.document.type}</span></button>)}{!components.length && <p className="empty-state">No saved components yet.</p>}{componentLoadError && <p className="error-message" role="alert">{componentLoadError}</p>}</div>
               <div className="outline"><strong>Screen outline</strong>{nestingTargetPath && <span className="nesting-target">Target: {nodeAtPath(parsed.document as JsonObject, nestingTargetPath)?.type}</span>}{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div>
             </section>
 
             {selectedNode && <section className="card property-editor">
               <div className="panel-heading compact"><div><h2>Component properties</h2><p>Editing <code>{selectedNode.type}</code></p></div>{selectedPath.length > 0 && <button className="danger-link" onClick={deleteSelectedNode}>Remove</button>}</div>
+              <button className="secondary save-as-component" onClick={() => openNewComponent(selectedNode)}>Save selected as component</button>
               {selectedPath.length > 0 && <div className="layout-actions"><button onClick={() => moveSelectedBy(-1)}>↑ Move up</button><button onClick={() => moveSelectedBy(1)}>↓ Move down</button><button onClick={duplicateSelectedNode}>Duplicate</button><button onClick={moveSelectedIntoTarget} disabled={!nestingTargetPath}>Move into target</button></div>}
               {isContainer(selectedNode) && <button className="nest-button" onClick={setNestingTarget}>Use {selectedNode.type} as nesting target</button>}
               {selectedNode.type === "text" && <>
@@ -1370,6 +1435,7 @@ export default function StudioPage() {
         </div>
 
         </>}
+        {componentModuleOpened && <div style={{ display: workspaceView === "components" ? "block" : "none" }}><ComponentLibraryPanel key={selectedProjectId + "-" + componentEditorKey} projectId={selectedProjectId} components={components} templates={componentTemplates} initialDocument={componentDraftSeed} resetKey={componentEditorKey} canEdit={studioRole === "designer" || studioRole === "admin"} onChanged={refreshComponents} onInsert={insertSavedComponent} renderPreview={(document) => <div className="component-preview-phone"><MobilePreview document={document} data={activeSampleData} state="content" onRetry={() => undefined} /></div>} />{componentLoadError && <p className="error-message" role="alert">{componentLoadError}</p>}</div>}
         {workspaceView === "figma" && <section className="figma-workspace">
           <header className="figma-workspace-header"><p className="eyebrow">DESIGN IMPORT</p><h1>Figma to JSON</h1><p>Convert a Figma frame or component, inspect the generated document, then apply it to the current draft.</p></header>
           <div className="figma-converter">
