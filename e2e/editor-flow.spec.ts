@@ -67,6 +67,33 @@ test('saving shows a spinner until the server responds', async ({ page }, testIn
   await expect(page.getByRole('button', { name: 'Save draft' })).toHaveAttribute('aria-busy', 'false');
 });
 
+test('Figma to JSON reviews generated content before changing the draft', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One viewport verifies the conversion review flow.');
+  await signIn(page);
+  await page.getByRole('button', { name: 'Open converter' }).click();
+  await page.getByLabel('Figma URL or file key').fill('https://www.figma.com/design/AbCdEf123456/Wallet?node-id=1-2');
+  await page.getByLabel('Figma access token').fill('test-token');
+  const editor = page.getByLabel('Advanced document editor');
+  const before = await editor.inputValue();
+  await page.route('**/api/figma/convert', async (route) => {
+    const input = route.request().postDataJSON();
+    expect(input.file).toContain('AbCdEf123456');
+    expect(input.accessToken).toBe('test-token');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      document: { type: 'column', children: [{ type: 'text', props: { value: 'Imported balance' } }] },
+      warnings: [{ nodeName: 'Icon', message: 'Manual asset needed.' }],
+      node: { name: 'Wallet', id: '1:2', type: 'FRAME' },
+    }) });
+  });
+  await page.getByRole('button', { name: 'Convert design' }).click();
+  await expect(page.locator('.import-review')).toContainText('Imported balance');
+  await expect(page.locator('.import-review')).toContainText('Icon: Manual asset needed.');
+  await expect(editor).toHaveValue(before);
+  await expect(page.getByLabel('Figma access token')).toHaveValue('');
+  await page.getByRole('button', { name: 'Apply to draft' }).click();
+  await expect(editor).toHaveValue(/Imported balance/);
+});
+
 test('draft, preview, publish, and archive work at each viewport', async ({ page }, testInfo) => {
   const width = testInfo.project.use.viewport?.width ?? 1440;
   await signIn(page);
@@ -131,3 +158,4 @@ test('reviewers cannot save screen versions', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.locator('.notice').first()).toContainText('Your account cannot save screen versions.');
 });
+

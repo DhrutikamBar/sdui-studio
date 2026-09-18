@@ -12,6 +12,12 @@ function toPortableNode(node: SceneNode): FigmaLikeNode {
   };
 
   if ("characters" in node) portable.characters = node.characters;
+  if (node.type === "TEXT") {
+    portable.style = {
+      ...(typeof node.fontSize === "number" ? { fontSize: node.fontSize } : {}),
+      ...(typeof node.fontWeight === "number" ? { fontWeight: node.fontWeight } : {}),
+    };
+  }
   if ("layoutMode" in node) portable.layoutMode = node.layoutMode;
   if ("paddingTop" in node) {
     portable.paddingTop = node.paddingTop;
@@ -68,3 +74,4 @@ figma.ui.onmessage = (message) => {
 };
 
 postSelection();
+

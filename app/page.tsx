@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { validateFlexflowDocument } from "../lib/validate";
 import { collectionBindingPath } from "../lib/preview-bindings";
-import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToStudio, signOutOfStudio } from "../lib/firebase";
+import { isFirebaseConfigured, observeStudioUser, resetStudioPassword, signInToStudio, signOutOfStudio, studioIdToken } from "../lib/firebase";
 import { loadRemoteVersions, saveRemoteScreenStatus, saveRemoteVersion, watchRemoteScreens } from "../lib/studio-store";
 import { writeStudioAudit } from "../lib/studio-governance";
 import { StudioGovernancePanel } from "./governance-panel";
@@ -437,6 +437,11 @@ export default function StudioPage() {
   const [showImporter, setShowImporter] = useState(false);
   const [importText, setImportText] = useState("");
   const [importCandidate, setImportCandidate] = useState<ImportCandidate | null>(null);
+  const [figmaFile, setFigmaFile] = useState("");
+  const [figmaNodeId, setFigmaNodeId] = useState("");
+  const [figmaToken, setFigmaToken] = useState("");
+  const [figmaBusy, setFigmaBusy] = useState(false);
+  const [figmaError, setFigmaError] = useState("");
   const [selectedPath, setSelectedPath] = useState<number[]>([]);
   const [nestingTargetPath, setNestingTargetPath] = useState<number[] | null>(null);
   const [bindingTarget, setBindingTarget] = useState("value");
@@ -778,6 +783,37 @@ export default function StudioPage() {
       setNotice("Import is valid and ready for review. Apply it only after checking the review panel.");
     } catch {
       setNotice("Import blocked: paste a complete JSON document from Studio or the Figma exporter.");
+    }
+  }
+
+  async function convertFigma() {
+    if (figmaBusy) return;
+    setFigmaBusy(true);
+    setFigmaError("");
+    setImportCandidate(null);
+    try {
+      const token = await studioIdToken();
+      const response = await fetch("/api/figma/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ file: figmaFile, nodeId: figmaNodeId, accessToken: figmaToken }),
+        cache: "no-store",
+      });
+      const result = await response.json() as {
+        document?: JsonObject;
+        warnings?: { nodeName: string; message: string }[];
+        node?: { name: string };
+        error?: string;
+      };
+      if (!response.ok || !result.document) throw new Error(result.error || "Figma conversion failed.");
+      const warnings = (result.warnings ?? []).map((warning) => warning.nodeName + ": " + warning.message);
+      setImportCandidate({ document: result.document, source: "Figma · " + (result.node?.name || "selected node"), warnings: [...warnings, ...inspectImport(result.document)] });
+      setNotice("Figma design converted. Review the JSON and warnings before applying it to the draft.");
+    } catch (error) {
+      setFigmaError(error instanceof Error ? error.message : "Figma conversion failed.");
+    } finally {
+      setFigmaToken("");
+      setFigmaBusy(false);
     }
   }
 
@@ -1233,12 +1269,26 @@ export default function StudioPage() {
             </div>
 
             <div className="import-bar">
-              <div><strong>Import or export a document</strong><span>Review Figma-export JSON safely, or download this draft as portable FlexFlow UI JSON.</span></div>
+              <div><strong>Figma to JSON</strong><span>Convert a Figma node, review its JSON, or import an existing document.</span></div>
               <div className="import-actions"><button className="secondary" onClick={() => exportDocument(json, "draft")}>Export draft</button>
-              <button className="secondary" onClick={() => setShowImporter((value) => !value)}>{showImporter ? "Close import" : "Import JSON"}</button>
+              <button className="secondary" onClick={() => { setShowImporter((value) => !value); setFigmaToken(""); setFigmaError(""); }}>{showImporter ? "Close converter" : "Open converter"}</button>
               </div>
             </div>
-            {showImporter && <div className="importer"><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste FlexFlow UI JSON or Figma exporter output here…" /><button className="primary" onClick={stageImport}>Validate for review</button>{importCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{importCandidate.source}</strong><p>The incoming document is valid. Applying it replaces the editor draft, not any published version.</p></div><div className="import-review-grid"><div><small>Incoming JSON</small><pre>{JSON.stringify(importCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{importCandidate.warnings.length ? <ul>{importCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={cancelImportReview}>Keep current draft</button><button className="primary" onClick={applyImport}>Apply to draft</button></div></div>}</div>}
+            {showImporter && <div className="importer">
+              <div className="figma-converter">
+                <div><strong>Figma to JSON</strong><p>Paste a Figma design URL or file key. Select one frame or component by node ID.</p></div>
+                <div className="figma-fields">
+                  <label>Figma URL or file key<input value={figmaFile} onChange={(event) => setFigmaFile(event.target.value)} placeholder="https://www.figma.com/design/…?node-id=1-2" autoComplete="off" /></label>
+                  <label>Node ID <span>(optional if URL includes one)</span><input value={figmaNodeId} onChange={(event) => setFigmaNodeId(event.target.value)} placeholder="1:2" autoComplete="off" /></label>
+                  <label>Figma access token<input type="password" value={figmaToken} onChange={(event) => setFigmaToken(event.target.value)} placeholder="Token with file_content:read" autoComplete="off" /></label>
+                </div>
+                <p className="figma-token-note">The token is used for this conversion and cleared afterward. It is not saved with the screen.</p>
+                <button className="primary loading-action" onClick={() => void convertFigma()} disabled={figmaBusy || !figmaFile.trim() || !figmaToken.trim()} aria-busy={figmaBusy}>{figmaBusy && <LoadingSpinner />}{figmaBusy ? "Converting…" : "Convert design"}</button>
+                {figmaError && <p className="error-message" role="alert">{figmaError}</p>}
+              </div>
+              <div className="manual-import"><strong>Or paste JSON</strong><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste FlexFlow UI JSON or Figma exporter output here…" /><button className="secondary" onClick={stageImport} disabled={!importText.trim()}>Validate for review</button></div>
+              {importCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{importCandidate.source}</strong><p>The incoming document is valid. Applying it replaces the editor draft, not any published version.</p></div><div className="import-review-grid"><div><small>Generated JSON</small><pre>{JSON.stringify(importCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{importCandidate.warnings.length ? <ul>{importCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={cancelImportReview}>Keep current draft</button><button className="secondary" onClick={() => void navigator.clipboard.writeText(JSON.stringify(importCandidate.document, null, 2)).then(() => setNotice("Generated JSON copied.")).catch(() => setNotice("Could not copy JSON. Download it instead."))}>Copy JSON</button><button className="secondary" onClick={() => exportDocument(JSON.stringify(importCandidate.document, null, 2), "figma")}>Download JSON</button><button className="primary" onClick={applyImport}>Apply to draft</button></div></div>}
+            </div>}
 
             <label className="json-label">Advanced document editor<textarea value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} /></label>
             {parsed.error && <p className="error-message">{parsed.error}</p>}
@@ -1342,4 +1392,5 @@ export default function StudioPage() {
     </main>
   );
 }
+
 

@@ -4,6 +4,8 @@ FlexFlow UI is an internal portal for creating, previewing, versioning, and publ
 
 It also includes **FlexFlow UI Exporter**, a local Figma development plugin that converts a selected design frame into a reviewable JSON starting point.
 
+The Studio editor also includes **Figma to JSON**. Open the converter next to the JSON editor, enter a Figma design URL or file key, a node ID (or a URL containing `node-id`), and a Figma personal access token with `file_content:read`. The server fetches only that node, converts it with the shared engine, and returns JSON plus layer warnings. The token is cleared from the form after the request and is not stored with the screen. Review, copy, or download the JSON before choosing **Apply to draft**. Saving and publishing remain separate actions.
+
 ## First MVP capabilities
 
 - Screen directory with draft and published versions
@@ -139,4 +141,5 @@ Admins can add and remove existing, active Studio members in the Governance view
 Deploy the updated server before publishing `firestore.rules`. The updated rules reserve project membership updates for the authenticated server endpoint; they do not allow direct browser edits to a project's `memberIds`.
 
 The mobile host must select the client project when it requests a remote screen (for example `projectId: "acme-banking-…"`). The current demo app deliberately continues to load the legacy project until that host integration is enabled.
+
 
