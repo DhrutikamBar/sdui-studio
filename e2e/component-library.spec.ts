@@ -44,7 +44,6 @@ test('create, reuse, and archive a project component', async ({ page }, testInfo
     await page.getByRole('button', { name: 'Close builder tools' }).last().click();
     await page.getByRole('button', { name: 'Open screen library' }).click();
     await page.getByLabel('Active client project').selectOption('legacy');
-    await page.getByRole('button', { name: 'Close screen library' }).last().click();
     await page.getByRole('button', { name: 'Open components' }).click();
     await expect(page.locator('.saved-component-palette').getByRole('button', { name: new RegExp(name) })).toBeVisible();
   }
