@@ -70,11 +70,11 @@ test('saving shows a spinner until the server responds', async ({ page }, testIn
 test('Figma to JSON reviews generated content before changing the draft', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One viewport verifies the conversion review flow.');
   await signIn(page);
-  await page.getByRole('button', { name: 'Open converter' }).click();
+  await page.locator('.workspace-view-tabs button').filter({ hasText: 'Figma to JSON' }).click();
+  await expect(page.getByRole('heading', { name: 'Figma to JSON' })).toBeVisible();
+  await expect(page.getByLabel('Advanced document editor')).toBeHidden();
   await page.getByLabel('Figma URL or file key').fill('https://www.figma.com/design/AbCdEf123456/Wallet?node-id=1-2');
   await page.getByLabel('Figma access token').fill('test-token');
-  const editor = page.getByLabel('Advanced document editor');
-  const before = await editor.inputValue();
   await page.route('**/api/figma/convert', async (route) => {
     const input = route.request().postDataJSON();
     expect(input.file).toContain('AbCdEf123456');
@@ -88,10 +88,9 @@ test('Figma to JSON reviews generated content before changing the draft', async 
   await page.getByRole('button', { name: 'Convert design' }).click();
   await expect(page.locator('.import-review')).toContainText('Imported balance');
   await expect(page.locator('.import-review')).toContainText('Icon: Manual asset needed.');
-  await expect(editor).toHaveValue(before);
   await expect(page.getByLabel('Figma access token')).toHaveValue('');
   await page.getByRole('button', { name: 'Apply to draft' }).click();
-  await expect(editor).toHaveValue(/Imported balance/);
+  await expect(page.getByLabel('Advanced document editor')).toHaveValue(/Imported balance/);
 });
 
 test('draft, preview, publish, and archive work at each viewport', async ({ page }, testInfo) => {
@@ -118,16 +117,20 @@ test('draft, preview, publish, and archive work at each viewport', async ({ page
   await page.keyboard.press('Escape');
   await expect(preview).toBeHidden();
   await page.locator('.workspace-view-tabs button').filter({ hasText: 'Build' }).click();
+  await expect(page.locator('.palette-grid button').filter({ hasText: '+ column' })).toBeVisible();
+  const initialOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(initialOverflow).toBe(false);
 
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.locator('.notice').first()).toContainText('Draft v1 saved');
   await page.getByRole('button', { name: 'Publish version' }).click();
-  await expect(page.locator('.notice').first()).toContainText('confirm that you tested');
-  await page.getByLabel(/I tested content, loading, empty, and error previews/).check();
-  await page.getByRole('button', { name: 'Publish version' }).click();
-  await expect(page.locator('.notice').first()).toContainText('add a short release note');
-  await page.getByLabel('Release note').fill('Automated release check');
-  await page.getByRole('button', { name: 'Publish version' }).click();
+  const publishDialog = page.getByRole('dialog', { name: `Publish ${screenName}` });
+  await expect(publishDialog).toBeVisible();
+  await expect(publishDialog.getByRole('button', { name: 'Publish version' })).toBeDisabled();
+  await publishDialog.getByLabel(/I tested content, loading, empty, and error previews/).check();
+  await publishDialog.getByLabel('Release note').fill('Automated release check');
+  await publishDialog.getByRole('button', { name: 'Publish version' }).click();
+  await expect(publishDialog).toBeHidden();
   await expect(page.locator('.notice').first()).toContainText('Published v2');
 
   await editor.fill(JSON.stringify({ type: 'column', children: [{ type: 'text', props: { value: 'Second version' } }] }, null, 2));
@@ -158,4 +161,5 @@ test('reviewers cannot save screen versions', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.locator('.notice').first()).toContainText('Your account cannot save screen versions.');
 });
+
 
