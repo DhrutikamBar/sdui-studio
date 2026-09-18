@@ -20,7 +20,7 @@ async function newScreen(page: Page) {
   await expect(menu).toBeFocused();
   await menu.click();
   await expect(page.locator('.sidebar')).toBeVisible();
-  await page.getByRole('button', { name: /New screen/ }).click();
+  await page.locator('.sidebar > .new-screen').click();
   await expect(page.locator('.sidebar')).toBeHidden();
   await expect(menu).toBeVisible();
   await expect(page.getByRole('heading', { name: 'New screen' })).toBeVisible();
