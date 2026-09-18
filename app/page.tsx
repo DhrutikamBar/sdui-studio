@@ -236,6 +236,7 @@ const componentTemplates: Record<string, JsonObject> = {
   text: { type: "text", props: { value: "New text", style: { color: "#142039", fontSize: 16 } } },
   button: { type: "button", props: { label: "Continue" }, action: { type: "navigate", target: "home" } },
   row: { type: "row", props: { style: { padding: "sm", arrangement: "spaceBetween" } }, children: [{ type: "text", props: { value: "Left label" } }, { type: "text", props: { value: "Right value" } }] },
+  column: { type: "column", props: { style: { padding: "md", gap: "sm" } }, children: [{ type: "text", props: { value: "Column item" } }] },
   card: { type: "box", props: { style: { padding: "md", background: "#FFFFFF", cornerRadius: 16 } }, children: [{ type: "text", props: { value: "Card title", style: { color: "#142039", fontWeight: "bold" } } }] },
   spacer: { type: "spacer", props: { height: 16 } },
   image: { type: "image", props: { src: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=600&q=80", contentDescription: "" } },
@@ -437,6 +438,7 @@ export default function StudioPage() {
   const [showImporter, setShowImporter] = useState(false);
   const [importText, setImportText] = useState("");
   const [importCandidate, setImportCandidate] = useState<ImportCandidate | null>(null);
+  const [figmaCandidate, setFigmaCandidate] = useState<ImportCandidate | null>(null);
   const [figmaFile, setFigmaFile] = useState("");
   const [figmaNodeId, setFigmaNodeId] = useState("");
   const [figmaToken, setFigmaToken] = useState("");
@@ -448,8 +450,9 @@ export default function StudioPage() {
   const [bindingFilter, setBindingFilter] = useState("");
   const [previewState, setPreviewState] = useState("content");
   const [showFloatingPreview, setShowFloatingPreview] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<"build" | "preview" | "governance">("build");
+  const [workspaceView, setWorkspaceView] = useState<"build" | "preview" | "governance" | "figma">("build");
   const [sampleScenario, setSampleScenario] = useState("standard");
   const [showArchived, setShowArchived] = useState(false);
   const [screenSearch, setScreenSearch] = useState("");
@@ -484,11 +487,13 @@ export default function StudioPage() {
   const drawerRef = useRef<HTMLElement>(null);
   const projectDialogRef = useRef<HTMLElement>(null);
   const previewDialogRef = useRef<HTMLElement>(null);
+  const publishDialogRef = useRef<HTMLElement>(null);
   const restoreDialogRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const active = pendingRestore ? restoreDialogRef.current
       : showProjectDialog ? projectDialogRef.current
+      : showPublishDialog ? publishDialogRef.current
       : showFloatingPreview ? previewDialogRef.current
       : mobileMenuOpen ? drawerRef.current : null;
     if (!active) return;
@@ -507,6 +512,7 @@ export default function StudioPage() {
         event.preventDefault();
         if (pendingRestore) setPendingRestore(null);
         else if (showProjectDialog) setShowProjectDialog(false);
+        else if (showPublishDialog) setShowPublishDialog(false);
         else if (showFloatingPreview) setShowFloatingPreview(false);
         else setMobileMenuOpen(false);
       }
@@ -526,7 +532,7 @@ export default function StudioPage() {
       if (wasDrawer && !drawerRef.current?.classList.contains("mobile-open")) mobileMenuButtonRef.current?.focus();
       else previousFocus?.focus();
     };
-  }, [mobileMenuOpen, showProjectDialog, showFloatingPreview, pendingRestore]);
+  }, [mobileMenuOpen, showProjectDialog, showPublishDialog, showFloatingPreview, pendingRestore]);
 
   useEffect(() => observeStudioUser((user) => {
     screenLoadGeneration.current += 1;
@@ -664,6 +670,7 @@ export default function StudioPage() {
       setSyncState("saved");
       setSyncDetail("Published version saved to shared workspace");
       setNotice("Published v" + saved.number + " to Firestore.");
+      setShowPublishDialog(false);
       setPublishNote("");
       setPreviewConfirmed(false);
     } catch (error) {
@@ -790,7 +797,7 @@ export default function StudioPage() {
     if (figmaBusy) return;
     setFigmaBusy(true);
     setFigmaError("");
-    setImportCandidate(null);
+    setFigmaCandidate(null);
     try {
       const token = await studioIdToken();
       const response = await fetch("/api/figma/convert", {
@@ -807,7 +814,7 @@ export default function StudioPage() {
       };
       if (!response.ok || !result.document) throw new Error(result.error || "Figma conversion failed.");
       const warnings = (result.warnings ?? []).map((warning) => warning.nodeName + ": " + warning.message);
-      setImportCandidate({ document: result.document, source: "Figma · " + (result.node?.name || "selected node"), warnings: [...warnings, ...inspectImport(result.document)] });
+      setFigmaCandidate({ document: result.document, source: "Figma · " + (result.node?.name || "selected node"), warnings: [...warnings, ...inspectImport(result.document)] });
       setNotice("Figma design converted. Review the JSON and warnings before applying it to the draft.");
     } catch (error) {
       setFigmaError(error instanceof Error ? error.message : "Figma conversion failed.");
@@ -824,6 +831,14 @@ export default function StudioPage() {
     setImportText("");
     setImportCandidate(null);
     setNotice("Import applied to the draft. Review its mobile preview, then save it as a new draft.");
+  }
+
+  function applyFigmaImport() {
+    if (!figmaCandidate) return;
+    setJson(JSON.stringify(figmaCandidate.document, null, 2));
+    setFigmaCandidate(null);
+    setWorkspaceView("build");
+    setNotice("Figma design applied to the draft. Review its mobile preview, then save a new draft.");
   }
 
   function cancelImportReview() {
@@ -1243,6 +1258,7 @@ export default function StudioPage() {
           <button className={workspaceView === "build" ? "active" : ""} aria-current={workspaceView === "build" ? "page" : undefined} onClick={() => setWorkspaceView("build")}><span>◫</span><div><strong>Build</strong><small>Screen editor</small></div></button>
           <button className={workspaceView === "preview" ? "active" : ""} aria-current={workspaceView === "preview" ? "page" : undefined} onClick={() => setWorkspaceView("preview")}><span>▣</span><div><strong>Preview</strong><small>Test states</small></div></button>
           <button className={workspaceView === "governance" ? "active" : ""} aria-current={workspaceView === "governance" ? "page" : undefined} onClick={() => setWorkspaceView("governance")}><span>◈</span><div><strong>Governance</strong><small>People & activity</small></div></button>
+          <button className={workspaceView === "figma" ? "active" : ""} aria-current={workspaceView === "figma" ? "page" : undefined} onClick={() => setWorkspaceView("figma")}><span>◇</span><div><strong>Figma to JSON</strong><small>Convert designs</small></div></button>
         </nav>
 
         {workspaceView === "build" && <>
@@ -1253,9 +1269,9 @@ export default function StudioPage() {
             <p className="home-subtitle">Edit and release the <code>/{route}</code> mobile screen.</p>
             <div className="home-meta"><span>{screenVersionLabel}</span><span>Updated {selectedScreen?.updatedAt ?? "now"}</span>{loadingScreenId && <span className="loading-inline"><LoadingSpinner />Loading screen…</span>}</div>
           </div>
-          <div className="home-hero-actions"><button className="secondary action-preview" onClick={() => setShowFloatingPreview(true)}>Preview screen</button><button className="secondary action-save loading-action" aria-busy={versionBusyAction === "draft"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>{versionBusyAction === "draft" && <LoadingSpinner />}{versionBusyAction === "draft" ? "Saving draft…" : "Save draft"}</button><button className="primary action-publish loading-action" aria-busy={versionBusyAction === "publish"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>{versionBusyAction === "publish" && <LoadingSpinner />}{versionBusyAction === "publish" ? "Publishing…" : "Publish version"}</button></div>
+          <div className="home-hero-actions"><button className="secondary action-preview" onClick={() => setShowFloatingPreview(true)}>Preview screen</button><button className="secondary action-save loading-action" aria-busy={versionBusyAction === "draft"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>{versionBusyAction === "draft" && <LoadingSpinner />}{versionBusyAction === "draft" ? "Saving draft…" : "Save draft"}</button><button className="primary action-publish" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={() => setShowPublishDialog(true)}>Publish version</button></div>
         </header>
-        <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary loading-action" aria-busy={versionBusyAction === "draft"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>{versionBusyAction === "draft" && <LoadingSpinner />}{versionBusyAction === "draft" ? "Saving…" : "Save draft"}</button><button className="primary loading-action" aria-busy={versionBusyAction === "publish"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={publish}>{versionBusyAction === "publish" && <LoadingSpinner />}{versionBusyAction === "publish" ? "Publishing…" : "Publish version"}</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
+        <div className="mobile-publish-bar" aria-label="Screen actions"><button className="secondary loading-action" aria-busy={versionBusyAction === "draft"} disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={saveDraft}>{versionBusyAction === "draft" && <LoadingSpinner />}{versionBusyAction === "draft" ? "Saving…" : "Save draft"}</button><button className="primary" disabled={versionSaveBusy || selectedScreen?.status === "Archived"} onClick={() => setShowPublishDialog(true)}>Publish version</button><button className="secondary" onClick={() => setShowFloatingPreview(true)}>Preview</button></div>
         <div className="home-guidance"><div className="home-next-step"><span className="home-next-icon" aria-hidden="true">↗</span><div><strong>Next step</strong><p>{homeNextStep}</p></div></div><div className="home-secondary-actions"><button onClick={duplicateScreen}>Duplicate</button>{screens.find((screen) => screen.id === selectedId)?.status === "Archived" ? <button className="loading-action" aria-busy={screenStatusAction === "Draft"} disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Draft")}>{screenStatusAction === "Draft" && <LoadingSpinner />}{screenStatusAction === "Draft" ? "Restoring…" : "Restore screen"}</button> : <button className="loading-action" aria-busy={screenStatusAction === "Archived"} disabled={screenStatusBusy} onClick={() => void changeScreenArchivedStatus("Archived")}>{screenStatusAction === "Archived" && <LoadingSpinner />}{screenStatusAction === "Archived" ? "Archiving…" : "Archive"}</button>}</div></div>
         <div className="notice" role="status">{notice}</div>
 
@@ -1269,24 +1285,13 @@ export default function StudioPage() {
             </div>
 
             <div className="import-bar">
-              <div><strong>Figma to JSON</strong><span>Convert a Figma node, review its JSON, or import an existing document.</span></div>
+              <div><strong>Import JSON</strong><span>Validate and review an existing document before applying it.</span></div>
               <div className="import-actions"><button className="secondary" onClick={() => exportDocument(json, "draft")}>Export draft</button>
-              <button className="secondary" onClick={() => { setShowImporter((value) => !value); setFigmaToken(""); setFigmaError(""); }}>{showImporter ? "Close converter" : "Open converter"}</button>
+              <button className="secondary" onClick={() => setShowImporter((value) => !value)}>{showImporter ? "Close importer" : "Import JSON"}</button>
               </div>
             </div>
             {showImporter && <div className="importer">
-              <div className="figma-converter">
-                <div><strong>Figma to JSON</strong><p>Paste a Figma design URL or file key. Select one frame or component by node ID.</p></div>
-                <div className="figma-fields">
-                  <label>Figma URL or file key<input value={figmaFile} onChange={(event) => setFigmaFile(event.target.value)} placeholder="https://www.figma.com/design/…?node-id=1-2" autoComplete="off" /></label>
-                  <label>Node ID <span>(optional if URL includes one)</span><input value={figmaNodeId} onChange={(event) => setFigmaNodeId(event.target.value)} placeholder="1:2" autoComplete="off" /></label>
-                  <label>Figma access token<input type="password" value={figmaToken} onChange={(event) => setFigmaToken(event.target.value)} placeholder="Token with file_content:read" autoComplete="off" /></label>
-                </div>
-                <p className="figma-token-note">The token is used for this conversion and cleared afterward. It is not saved with the screen.</p>
-                <button className="primary loading-action" onClick={() => void convertFigma()} disabled={figmaBusy || !figmaFile.trim() || !figmaToken.trim()} aria-busy={figmaBusy}>{figmaBusy && <LoadingSpinner />}{figmaBusy ? "Converting…" : "Convert design"}</button>
-                {figmaError && <p className="error-message" role="alert">{figmaError}</p>}
-              </div>
-              <div className="manual-import"><strong>Or paste JSON</strong><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste FlexFlow UI JSON or Figma exporter output here…" /><button className="secondary" onClick={stageImport} disabled={!importText.trim()}>Validate for review</button></div>
+              <div className="manual-import"><strong>Paste JSON</strong><textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste FlexFlow UI JSON or Figma exporter output here…" /><button className="secondary" onClick={stageImport} disabled={!importText.trim()}>Validate for review</button></div>
               {importCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{importCandidate.source}</strong><p>The incoming document is valid. Applying it replaces the editor draft, not any published version.</p></div><div className="import-review-grid"><div><small>Generated JSON</small><pre>{JSON.stringify(importCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{importCandidate.warnings.length ? <ul>{importCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={cancelImportReview}>Keep current draft</button><button className="secondary" onClick={() => void navigator.clipboard.writeText(JSON.stringify(importCandidate.document, null, 2)).then(() => setNotice("Generated JSON copied.")).catch(() => setNotice("Could not copy JSON. Download it instead."))}>Copy JSON</button><button className="secondary" onClick={() => exportDocument(JSON.stringify(importCandidate.document, null, 2), "figma")}>Download JSON</button><button className="primary" onClick={applyImport}>Apply to draft</button></div></div>}
             </div>}
 
@@ -1357,12 +1362,7 @@ export default function StudioPage() {
             </section>
 
             <section className="card versions">
-              <div className="panel-heading compact"><div><h2>Release workflow</h2><p>Publish only after validation and preview review.</p></div><button className="link-button" aria-expanded={showCompare} onClick={() => setShowCompare((value) => !value)}>Compare</button></div>
-              <label>Release note<input value={publishNote} placeholder="What changed in this version?" onChange={(event) => setPublishNote(event.target.value)} /></label>
-              <label className="check-label"><input type="checkbox" checked={previewConfirmed} onChange={(event) => setPreviewConfirmed(event.target.checked)} /> I tested content, loading, empty, and error previews</label>
-              <p className={parsed.error ? "workflow-error" : "workflow-ok"}>{parsed.error ? "JSON, bindings, or actions need attention." : "Document validation passed."}</p>
-              {showCompare && <div className="compare-panel"><strong>Current draft vs latest published</strong><div><pre>{(versions[selectedId] ?? []).find((version) => version.status === "Published")?.document ?? "No published version yet."}</pre><pre>{json}</pre></div></div>}
-              <h2>Version history</h2>
+              <div className="panel-heading compact"><div><h2>Version history</h2><p>Review, restore, or export previous versions.</p></div></div>
               {(versions[selectedId] ?? []).slice(0, 4).map((version) => <div className="version-row" key={version.id}><strong>v{version.number}</strong><span>{version.status}{version.note ? " · " + version.note : ""}</span><small>{version.createdAt}</small><div className="version-actions"><button className="link-button" onClick={() => restoreVersion(version)}>Restore</button><button className="link-button" onClick={() => exportDocument(version.document, "v" + version.number + "-" + version.status)}>Export</button></div></div>)}
               {!(versions[selectedId] ?? []).length && <p className="empty-state">No saved versions yet.</p>}
             </section>
@@ -1370,6 +1370,21 @@ export default function StudioPage() {
         </div>
 
         </>}
+        {workspaceView === "figma" && <section className="figma-workspace">
+          <header className="figma-workspace-header"><p className="eyebrow">DESIGN IMPORT</p><h1>Figma to JSON</h1><p>Convert a Figma frame or component, inspect the generated document, then apply it to the current draft.</p></header>
+          <div className="figma-converter">
+            <div><strong>Choose a design node</strong><p>Paste a Figma design URL or file key. Select one frame or component by node ID.</p></div>
+            <div className="figma-fields">
+              <label>Figma URL or file key<input value={figmaFile} onChange={(event) => setFigmaFile(event.target.value)} placeholder="https://www.figma.com/design/…?node-id=1-2" autoComplete="off" /></label>
+              <label>Node ID <span>(optional if URL includes one)</span><input value={figmaNodeId} onChange={(event) => setFigmaNodeId(event.target.value)} placeholder="1:2" autoComplete="off" /></label>
+              <label>Figma access token<input type="password" value={figmaToken} onChange={(event) => setFigmaToken(event.target.value)} placeholder="Token with file_content:read" autoComplete="off" /></label>
+            </div>
+            <p className="figma-token-note">The token is used for this conversion and cleared afterward. It is not saved with the screen.</p>
+            <button className="primary loading-action" onClick={() => void convertFigma()} disabled={figmaBusy || !figmaFile.trim() || !figmaToken.trim()} aria-busy={figmaBusy}>{figmaBusy && <LoadingSpinner />}{figmaBusy ? "Converting…" : "Convert design"}</button>
+            {figmaError && <p className="error-message" role="alert">{figmaError}</p>}
+          </div>
+          {figmaCandidate && <div className="import-review"><div><span className="review-badge">Ready to review</span><strong>{figmaCandidate.source}</strong><p>Applying this document replaces the editor draft. Your published version remains live until you publish again.</p></div><div className="import-review-grid"><div><small>Generated JSON</small><pre>{JSON.stringify(figmaCandidate.document, null, 2)}</pre></div><div><small>Current draft</small><pre>{json}</pre></div></div><div className="review-warnings"><strong>Conversion checks</strong>{figmaCandidate.warnings.length ? <ul>{figmaCandidate.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No conversion warnings found.</p>}</div><div className="review-actions"><button className="secondary" onClick={() => setFigmaCandidate(null)}>Keep current draft</button><button className="secondary" onClick={() => void navigator.clipboard.writeText(JSON.stringify(figmaCandidate.document, null, 2)).then(() => setNotice("Generated JSON copied.")).catch(() => setNotice("Could not copy JSON. Download it instead."))}>Copy JSON</button><button className="secondary" onClick={() => exportDocument(JSON.stringify(figmaCandidate.document, null, 2), "figma")}>Download JSON</button><button className="primary" onClick={applyFigmaImport}>Apply to draft</button></div></div>}
+        </section>}
         {workspaceView === "governance" && <><div className="notice workspace-notice" role="status">Manage roles, project access, and the immutable activity history for this workspace.</div><StudioGovernancePanel actor={firebaseUser} project={selectedProject} /></>}
         {workspaceView === "preview" && <><div className="notice workspace-notice" role="status">Test the selected screen before publishing it. Preview data and failure states never change the live mobile screen.</div>
 
@@ -1378,6 +1393,7 @@ export default function StudioPage() {
           <button className="primary preview-launch-button" onClick={() => setShowFloatingPreview(true)}>Open mobile preview</button>
         </section>
         </>}
+        {showPublishDialog && <div className="floating-preview-backdrop" role="presentation"><section ref={publishDialogRef} className="publish-dialog" role="dialog" aria-modal="true" aria-labelledby="publish-dialog-title"><header><div><p className="eyebrow">RELEASE WORKFLOW</p><h2 id="publish-dialog-title">Publish {title}</h2><p>Review this release before making it live for the mobile app.</p></div><button className="dialog-close" disabled={versionBusyAction === "publish"} onClick={() => setShowPublishDialog(false)} aria-label="Close publish dialog">×</button></header><div className="publish-dialog-body"><p className={parsed.error ? "workflow-error" : "workflow-ok"}>{parsed.error ? "JSON, bindings, or actions need attention." : "Document validation passed."}</p><label>Release note<input value={publishNote} placeholder="What changed in this version?" onChange={(event) => setPublishNote(event.target.value)} /></label><label className="check-label"><input type="checkbox" checked={previewConfirmed} onChange={(event) => setPreviewConfirmed(event.target.checked)} /> I tested content, loading, empty, and error previews</label><button className="link-button" aria-expanded={showCompare} onClick={() => setShowCompare((value) => !value)}>{showCompare ? "Hide comparison" : "Compare with latest published"}</button>{showCompare && <div className="compare-panel"><strong>Current draft vs latest published</strong><div><pre>{(versions[selectedId] ?? []).find((version) => version.status === "Published")?.document ?? "No published version yet."}</pre><pre>{json}</pre></div></div>}<p className="publish-feedback" role="status">{notice.startsWith("Publishing blocked:") || notice.startsWith("Could not confirm the publish") ? notice : ""}</p></div><div className="dialog-actions"><button className="secondary" disabled={versionBusyAction === "publish"} onClick={() => setShowPublishDialog(false)}>Cancel</button><button className="primary loading-action" aria-busy={versionBusyAction === "publish"} disabled={versionBusyAction === "publish" || !!parsed.error || !previewConfirmed || !publishNote.trim()} onClick={() => void publish()}>{versionBusyAction === "publish" && <LoadingSpinner />}{versionBusyAction === "publish" ? "Publishing…" : "Publish version"}</button></div></section></div>}
         {showFloatingPreview && <div className="floating-preview-backdrop" role="presentation">
           <section ref={previewDialogRef} className="floating-preview-dialog" role="dialog" aria-modal="true" aria-label="Mobile screen preview">
             <header className="floating-preview-header"><div><p className="eyebrow">LIVE PREVIEW</p><strong>{title}</strong><small>Drag the lower-right corner to resize on desktop.</small></div><button className="logout-button" onClick={() => setShowFloatingPreview(false)} aria-label="Close mobile preview">Close</button></header>
@@ -1392,5 +1408,6 @@ export default function StudioPage() {
     </main>
   );
 }
+
 
 
