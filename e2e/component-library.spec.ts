@@ -21,7 +21,7 @@ test('create, reuse, and archive a project component', async ({ page }, testInfo
   const name = `Product section ${testInfo.project.name} ${Date.now()}`;
   await page.getByLabel('Component name').fill(name);
   await page.getByLabel('Category').fill('Commerce');
-  await page.getByLabel('Description').fill('Header with product items');
+  await page.getByLabel('Description', { exact: true }).fill('Header with product items');
   await page.getByRole('button', { name: 'Save component' }).click();
   await expect(page.locator('.component-feedback')).toContainText('saved to this project');
   await expect(page.locator('.saved-component').filter({ hasText: name })).toBeVisible();
