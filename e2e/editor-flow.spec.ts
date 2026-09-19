@@ -117,11 +117,15 @@ test('draft, preview, publish, and archive work at each viewport', async ({ page
   await page.keyboard.press('Escape');
   await expect(preview).toBeHidden();
   await page.locator('.workspace-view-tabs button').filter({ hasText: 'Build' }).click();
+  const graph = page.getByRole('region', { name: 'JSON graph' });
+  await expect(graph).toBeVisible();
+  await expect(graph.getByRole('button', { name: 'column', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open widgets' })).toBeVisible();
   await page.getByRole('button', { name: 'Open widgets' }).click();
   await expect(page.locator('.palette-grid button').filter({ hasText: '+ column' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Widgets' })).toBeHidden();
+  await expect(graph).toBeVisible();
   const initialOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(initialOverflow).toBe(false);
 
