@@ -454,6 +454,7 @@ export default function StudioPage() {
   const [showFloatingPreview, setShowFloatingPreview] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeToolDrawer, setActiveToolDrawer] = useState<"widgets" | "components" | null>(null);
   const [workspaceView, setWorkspaceView] = useState<"build" | "preview" | "governance" | "figma" | "components">("build");
   const [studioRole, setStudioRole] = useState<StudioRole>("reviewer");
   const [components, setComponents] = useState<StudioComponent[]>([]);
@@ -493,6 +494,9 @@ export default function StudioPage() {
   const versionSaveInFlight = useRef(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  const toolDrawerRef = useRef<HTMLElement>(null);
+  const toolLauncherRefs = useRef<Record<"widgets" | "components", HTMLButtonElement | null>>({ widgets: null, components: null });
+  const lastToolLauncher = useRef<"widgets" | "components">("widgets");
   const projectDialogRef = useRef<HTMLElement>(null);
   const previewDialogRef = useRef<HTMLElement>(null);
   const publishDialogRef = useRef<HTMLElement>(null);
@@ -503,10 +507,12 @@ export default function StudioPage() {
       : showProjectDialog ? projectDialogRef.current
       : showPublishDialog ? publishDialogRef.current
       : showFloatingPreview ? previewDialogRef.current
+      : activeToolDrawer ? toolDrawerRef.current
       : mobileMenuOpen ? drawerRef.current : null;
     if (!active) return;
 
     const wasDrawer = active === drawerRef.current;
+    const wasToolDrawer = active === toolDrawerRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -522,6 +528,7 @@ export default function StudioPage() {
         else if (showProjectDialog) setShowProjectDialog(false);
         else if (showPublishDialog) setShowPublishDialog(false);
         else if (showFloatingPreview) setShowFloatingPreview(false);
+        else if (activeToolDrawer) setActiveToolDrawer(null);
         else setMobileMenuOpen(false);
       }
       if (event.key !== "Tab") return;
@@ -538,9 +545,10 @@ export default function StudioPage() {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
       if (wasDrawer && !drawerRef.current?.classList.contains("mobile-open")) mobileMenuButtonRef.current?.focus();
+      else if (wasToolDrawer && !toolDrawerRef.current?.classList.contains("open")) toolLauncherRefs.current[lastToolLauncher.current]?.focus();
       else previousFocus?.focus();
     };
-  }, [mobileMenuOpen, showProjectDialog, showPublishDialog, showFloatingPreview, pendingRestore]);
+  }, [mobileMenuOpen, activeToolDrawer, showProjectDialog, showPublishDialog, showFloatingPreview, pendingRestore]);
 
   useEffect(() => observeStudioUser((user) => {
     screenLoadGeneration.current += 1;
@@ -797,6 +805,7 @@ export default function StudioPage() {
   }
 
   function openNewComponent(source: JsonObject | null = null) {
+    setActiveToolDrawer(null);
     setComponentDraftSeed(source ? copyComponentTree(source) : null);
     setComponentEditorKey((value) => value + 1);
     setComponentModuleOpened(true);
@@ -819,6 +828,7 @@ export default function StudioPage() {
       setSelectedPath([...(candidate === document ? [] : selectedPath), candidate.children.length - 1]);
     }
     setWorkspaceView("build");
+    setActiveToolDrawer(null);
     setNotice(component.name + " added to the screen draft. This copy can be edited independently; save the draft when ready.");
   }
 
@@ -942,6 +952,7 @@ export default function StudioPage() {
     setJson(JSON.stringify(document, null, 2));
     const targetPath = selectedContainer && isContainer(selectedContainer) ? selectedPath : [];
     setSelectedPath([...targetPath, (target.children?.length ?? 1) - 1]);
+    setActiveToolDrawer(null);
     setNotice("Added a " + kind + " component " + (targetPath.length ? "inside the selected container." : "to the root screen."));
   }
 
@@ -1094,7 +1105,13 @@ export default function StudioPage() {
 
   function outline(node: JsonObject, path: number[] = [], depth = 0): ReactNode {
     const isSelected = path.length === selectedPath.length && path.every((value, index) => value === selectedPath[index]);
-    return <div className="outline-node" key={node.id ?? (path.join("-") || "root")} style={{ paddingLeft: depth * 12 }}><button className={isSelected ? "outline-selected" : ""} onClick={() => { setSelectedPath(path); setBindingTarget(bindableTargets(node)[0]?.value ?? "style.color"); }}>{node.type ?? "unknown"}</button>{node.children?.map((child, index) => outline(child, [...path, index], depth + 1))}</div>;
+    return <div className="outline-node" key={node.id ?? (path.join("-") || "root")} style={{ paddingLeft: depth * 12 }}><button className={isSelected ? "outline-selected" : ""} onClick={() => { setSelectedPath(path); setBindingTarget(bindableTargets(node)[0]?.value ?? "style.color"); setActiveToolDrawer(null); }}>{node.type ?? "unknown"}</button>{node.children?.map((child, index) => outline(child, [...path, index], depth + 1))}</div>;
+  }
+
+  function openToolDrawer(section: "widgets" | "components") {
+    lastToolLauncher.current = section;
+    setMobileMenuOpen(false);
+    setActiveToolDrawer(section);
   }
 
   const selectedNode = parsed.document ? nodeAtPath(parsed.document, selectedPath) : null;
@@ -1325,6 +1342,16 @@ export default function StudioPage() {
         </nav>
 
         {workspaceView === "build" && <>
+        {!activeToolDrawer && <div className="tool-edge-launchers" aria-label="Builder tools">
+          <button ref={(node) => { toolLauncherRefs.current.widgets = node; }} aria-controls="builder-tool-drawer" aria-expanded="false" aria-label="Open widgets" onClick={() => openToolDrawer("widgets")}><span aria-hidden="true">‹</span><strong>Widgets</strong></button>
+          <button ref={(node) => { toolLauncherRefs.current.components = node; }} aria-controls="builder-tool-drawer" aria-expanded="false" aria-label="Open components" onClick={() => openToolDrawer("components")}><span aria-hidden="true">‹</span><strong>Components</strong></button>
+        </div>}
+        {activeToolDrawer && <button className="tool-drawer-backdrop" aria-label="Close builder tools" onClick={() => setActiveToolDrawer(null)} />}
+        <aside ref={toolDrawerRef} id="builder-tool-drawer" className={"tool-drawer " + (activeToolDrawer ? "open" : "")} role="dialog" aria-modal={activeToolDrawer ? "true" : undefined} aria-label={activeToolDrawer === "components" ? "Components" : "Widgets"} aria-hidden={!activeToolDrawer}>
+          <header className="tool-drawer-header"><div><p className="eyebrow">VISUAL BUILDER</p><h2>{activeToolDrawer === "components" ? "Components" : "Widgets"}</h2></div><button className="tool-drawer-close" aria-label="Close builder tools" onClick={() => setActiveToolDrawer(null)}>×</button></header>
+          <nav className="tool-drawer-tabs" aria-label="Builder tool sections"><button className={activeToolDrawer === "widgets" ? "active" : ""} aria-pressed={activeToolDrawer === "widgets"} onClick={() => setActiveToolDrawer("widgets")}>Widgets</button><button className={activeToolDrawer === "components" ? "active" : ""} aria-pressed={activeToolDrawer === "components"} onClick={() => setActiveToolDrawer("components")}>Components</button></nav>
+          {activeToolDrawer === "widgets" ? <div className="tool-drawer-content"><p>Add to {selectedNode && isContainer(selectedNode) ? "selected " + selectedNode.type : "root screen"}.</p><div className="palette-grid">{Object.keys(componentTemplates).map((kind) => <button key={kind} onClick={() => addComponent(kind)}><strong>+ {kind}</strong><span>Add to screen</span></button>)}</div><div className="outline"><strong>Screen outline</strong>{nestingTargetPath && <span className="nesting-target">Target: {nodeAtPath(parsed.document as JsonObject, nestingTargetPath)?.type}</span>}{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div></div> : <div className="tool-drawer-content saved-component-palette"><div className="panel-heading compact"><div><h3>My components</h3><p>Reusable groups in {selectedProject.name}</p></div><button className="link-button" onClick={() => openNewComponent()}>Create</button></div>{components.map((component) => <button key={component.id} onClick={() => insertSavedComponent(component)}><strong>+ {component.name}</strong><span>{component.category} · {component.document.type}</span></button>)}{!components.length && <p className="empty-state">No saved components yet.</p>}{componentLoadError && <p className="error-message" role="alert">{componentLoadError}</p>}</div>}
+        </aside>
         <header className="home-hero">
           <div className="home-hero-copy">
             <p className="eyebrow">BUILD WORKSPACE / {selectedProject.name.toUpperCase()}</p>
@@ -1363,15 +1390,6 @@ export default function StudioPage() {
           </section>
 
           <aside className="right-column">
-            <section className="card component-palette">
-              <div className="panel-heading compact"><div><h2>Visual builder</h2><p>Add to {selectedNode && isContainer(selectedNode) ? "selected " + selectedNode.type : "root screen"}.</p></div></div>
-              <div className="palette-grid">
-                {Object.keys(componentTemplates).map((kind) => <button key={kind} onClick={() => addComponent(kind)}><strong>+ {kind}</strong><span>Add to root</span></button>)}
-              </div>
-              <div className="saved-component-palette"><div className="panel-heading compact"><div><h3>My components</h3><p>Reusable groups in {selectedProject.name}</p></div><button className="link-button" onClick={() => openNewComponent()}>Create</button></div>{components.map((component) => <button key={component.id} onClick={() => insertSavedComponent(component)}><strong>+ {component.name}</strong><span>{component.category} · {component.document.type}</span></button>)}{!components.length && <p className="empty-state">No saved components yet.</p>}{componentLoadError && <p className="error-message" role="alert">{componentLoadError}</p>}</div>
-              <div className="outline"><strong>Screen outline</strong>{nestingTargetPath && <span className="nesting-target">Target: {nodeAtPath(parsed.document as JsonObject, nestingTargetPath)?.type}</span>}{parsed.document ? outline(parsed.document) : <span>Valid JSON is required.</span>}</div>
-            </section>
-
             {selectedNode && <section className="card property-editor">
               <div className="panel-heading compact"><div><h2>Component properties</h2><p>Editing <code>{selectedNode.type}</code></p></div>{selectedPath.length > 0 && <button className="danger-link" onClick={deleteSelectedNode}>Remove</button>}</div>
               <button className="secondary save-as-component" onClick={() => openNewComponent(selectedNode)}>Save selected as component</button>

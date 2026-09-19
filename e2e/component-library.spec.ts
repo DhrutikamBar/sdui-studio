@@ -27,8 +27,11 @@ test('create, reuse, and archive a project component', async ({ page }, testInfo
   await expect(page.locator('.saved-component').filter({ hasText: name })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open components' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open components' }).click();
   await expect(page.locator('.saved-component-palette').getByRole('button', { name: new RegExp(name) })).toBeVisible();
   if (testInfo.project.name === 'desktop') {
+    await page.getByRole('button', { name: 'Close builder tools' }).last().click();
     await page.getByRole('button', { name: 'Open screen library' }).click();
     await page.getByRole('button', { name: 'New client project' }).click();
     const projectName = `Component isolation ${Date.now()}`;
@@ -36,9 +39,12 @@ test('create, reuse, and archive a project component', async ({ page }, testInfo
     await page.getByLabel('Android / iOS package name').fill('com.example.componentisolated');
     await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page.locator('.app-brand')).toContainText(projectName);
+    await page.getByRole('button', { name: 'Open components' }).click();
     await expect(page.locator('.saved-component-palette').getByRole('button', { name: new RegExp(name) })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Close builder tools' }).last().click();
     await page.getByRole('button', { name: 'Open screen library' }).click();
     await page.getByLabel('Active client project').selectOption('legacy');
+    await page.getByRole('button', { name: 'Open components' }).click();
     await expect(page.locator('.saved-component-palette').getByRole('button', { name: new RegExp(name) })).toBeVisible();
   }
   await page.locator('.saved-component-palette').getByRole('button', { name: new RegExp(name) }).click();
