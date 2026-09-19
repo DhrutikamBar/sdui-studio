@@ -297,9 +297,15 @@ body {
 .tool-drawer-tabs button.active { color: var(--accent-ink); background: var(--glass-strong); box-shadow: 0 4px 14px rgba(26, 37, 80, .12); }
 .tool-drawer-content > p:first-child { color: var(--muted); }
 .tool-drawer .palette-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tool-drawer .outline { margin-top: 18px; }
 .tool-drawer .saved-component-palette { border-top: 0; margin-top: 0; padding-top: 0; }
 .tool-drawer :focus-visible, .tool-edge-launchers :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.json-graph-tree { max-height: 430px; overflow: auto; padding: 8px 6px 8px 0; }
+.json-graph-tree .outline-node { position: relative; margin: 0; border-left: 1px solid var(--glass-border); }
+.json-graph-tree .outline-node::before { content: ""; position: absolute; top: 20px; left: 0; width: 10px; border-top: 1px solid var(--glass-border); }
+.json-graph-tree .outline-node > button { min-height: 35px; margin: 3px 0 3px 11px; padding: 6px 10px; border: 1px solid var(--glass-border); border-radius: 8px; background: var(--control); font-size: 12px; text-transform: capitalize; }
+.json-graph-tree .outline-node > button.outline-selected { border-color: var(--brand); font-weight: 800; }
+.json-graph-tree .outline-node > button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 @media (max-width: 860px) {
   .sidebar { width: min(306px, calc(100vw - 42px)) !important; padding: 20px 14px !important; }
